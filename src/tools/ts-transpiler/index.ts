@@ -33,9 +33,19 @@ function transpile() {
   )} --extensions ".ts,.tsx" --copy-files`;
 
   try {
+    console.log(`Type Checking Files...`);
+    execSync(`npx tsc --noEmit`, { stdio: 'inherit' });
+
     console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
     execSync(babelCmd, { stdio: 'inherit' });
+
     console.log('✅ Transpilation completed!');
+
+    console.log('Generating declaration files');
+
+    execSync(`npx tsc --emitDeclarationOnly --outDir ${outDir}`, {
+      stdio: 'inherit',
+    });
   } catch (error) {
     console.error('❌ Error transpiling files:', error);
     process.exit(1);
