@@ -10,9 +10,6 @@
   "bin": {
     "tsx-transpile": "./dist/tools/ts-transpiler/index.js"
   },
-  "files": [
-    "dist"
-  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
