@@ -29,7 +29,7 @@ function transpile() {
 
   const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --config-file ${path.resolve(
     __dirname,
-    '../babel.config.json'
+    '../../../babel.config.json'
   )} --extensions ".ts,.tsx" --copy-files`;
 
   try {
