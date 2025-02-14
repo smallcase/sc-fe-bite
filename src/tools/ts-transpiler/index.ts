@@ -4,6 +4,62 @@ import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
+function generateDeclaration(srcDir: string, outDir: string) {
+  const packageRoot = path.dirname(srcDir);
+  const packageTsConfig = path.resolve(packageRoot, 'tsconfig.json');
+  const globalPackageConfig = path.resolve(
+    __dirname,
+    '../tsconfig.package.json'
+  );
+
+  // Base Ts File which will be copied over to package
+  const tsconfigContent = JSON.stringify(
+    {
+      compilerOptions: {
+        outDir: outDir,
+        target: 'ESNext',
+        strict: true,
+        esModuleInterop: true,
+        declaration: true,
+        declarationMap: true,
+        emitDeclarationOnly: true,
+        skipLibCheck: true,
+        jsx: 'preserve',
+      },
+      include: [srcDir],
+    },
+    null,
+    2
+  );
+
+  let tsConfigToUse: string;
+  let tempConfig = false;
+
+  if (fs.existsSync(packageTsConfig)) {
+    tsConfigToUse = packageTsConfig;
+  } else if (fs.existsSync(globalPackageConfig)) {
+    tsConfigToUse = globalPackageConfig;
+  } else {
+    // If package doesn't have a ts config then add a temporary config to generate the declaration files
+    tsConfigToUse = path.join(packageRoot, 'tsconfig.temp.json');
+    tempConfig = true;
+    fs.writeFileSync(tsConfigToUse, tsconfigContent);
+  }
+
+  try {
+    console.log(`🚀 Generating Type declarations for ${srcDir}`);
+    execSync(
+      `npx tsc --emitDeclarationOnly --outDir ${outDir} --project ${tsConfigToUse}`,
+      { stdio: 'inherit' }
+    );
+  } finally {
+    // Clear out temp tsconfig file once types are generated
+    if (tempConfig) {
+      fs.unlinkSync(tsConfigToUse);
+    }
+  }
+}
+
 function transpile() {
   // Get directory argument
   const args = process.argv.slice(2);
@@ -33,19 +89,13 @@ function transpile() {
   )} --extensions ".ts,.tsx" --copy-files`;
 
   try {
-    console.log(`Type Checking Files...`);
-    execSync(`npx tsc --noEmit`, { stdio: 'inherit' });
-
     console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
+
     execSync(babelCmd, { stdio: 'inherit' });
 
     console.log('✅ Transpilation completed!');
 
-    console.log('Generating declaration files');
-
-    execSync(`npx tsc --emitDeclarationOnly --outDir ${outDir}`, {
-      stdio: 'inherit',
-    });
+    generateDeclaration(srcDir, outDir);
   } catch (error) {
     console.error('❌ Error transpiling files:', error);
     process.exit(1);
