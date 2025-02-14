@@ -3,11 +3,16 @@
   "version": "1.2.1",
   "main": "index.js",
   "scripts": {
+    "build": "rm -rf dist && tsc",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "tsx-transpile": "./src/index.js"
+    "tsx-transpile": "./dist/tools/ts-transpiler/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -19,6 +24,8 @@
     "@babel/plugin-transform-typescript": "^7.26.8",
     "@babel/preset-env": "^7.26.8",
     "@babel/preset-react": "^7.26.3",
-    "@babel/preset-typescript": "^7.26.0"
+    "@babel/preset-typescript": "^7.26.0",
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
   }
 }
