@@ -25,7 +25,10 @@ if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
 
-const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --extensions ".ts,.tsx" --copy-files`;
+const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --config-file ${path.resolve(
+  __dirname,
+  '../babel.config.json'
+)} --extensions ".ts,.tsx" --copy-files`;
 
 try {
   console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
