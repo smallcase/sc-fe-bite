@@ -8,6 +8,7 @@ import chokidar from 'chokidar';
 
 // Internal modules
 import { renameToJSX } from '../js-to-jsx/make';
+import { Logger } from '../../utils/logger';
 
 /**
  * function to generate the declaration files for a given folder
@@ -57,16 +58,16 @@ function generateDeclaration(srcDir: string, outDir: string) {
   }
 
   try {
-    console.log(`🚀 Generating Type declarations for ${srcDir}`);
+    Logger.Info(`Generating Type declarations for ${srcDir}`);
 
     execSync(
       `npx tsc --emitDeclarationOnly --outDir ${outDir} --project ${tsConfigToUse}`,
       { stdio: 'inherit' }
     );
 
-    console.log('✅ Generated Type declarations');
+    Logger.Success('Generated Type declarations');
   } catch (error) {
-    console.log('❌ Error generating declaration files', error);
+    Logger.Error(`Error generating declaration files: ${error}`);
   } finally {
     // Clear out temp tsconfig file once types are generated
     if (tempConfig) {
@@ -82,13 +83,13 @@ function transformToJavascript(srcDir: string, outDir: string) {
   )} --extensions ".ts,.tsx" --copy-files`;
 
   try {
-    console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
+    Logger.Info(`Transpiling files from ${srcDir}`);
 
     execSync(babelCmd, { stdio: 'inherit' });
 
-    console.log('✅ Transpilation completed!');
+    Logger.Success('Transpilation completed!');
   } catch (error) {
-    console.error('❌ Error transpiling files:', error);
+    Logger.Error(`Error transpiling files:, ${error}`);
     process.exit(1);
   }
 }
@@ -109,7 +110,8 @@ function startTransformation(srcDir: string, outDir: string) {
     // Step 3. -> Rename js to jsx for better HMR support during development
     renameToJSX(outDir);
   } catch (error) {
-    console.error('❌ Error building package:', error);
+    Logger.Error(`Error building package:, ${error}`);
+    process.exit(1);
   }
 }
 
@@ -118,7 +120,7 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: tsx-transpile <src-dir>');
+    Logger.Error('Usage: tsx-transpile <src-dir>');
     process.exit(1);
   }
 
@@ -127,7 +129,7 @@ function main() {
 
   // Ensure source directory exists
   if (!fs.existsSync(srcDir)) {
-    console.error(`Error: Source directory "${srcDir}" does not exist.`);
+    Logger.Error(`Error: Source directory "${srcDir}" does not exist.`);
     process.exit(1);
   }
 
@@ -142,7 +144,7 @@ function main() {
 
   if (args.includes('--watch')) {
     chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
-      console.log('🔄 Detected changes, rebuilding...');
+      Logger.Info('🔄 Detected changes, rebuilding...');
       startTransformation(srcDir, outDir);
     });
   }

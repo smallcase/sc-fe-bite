@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import * as babelParser from '@babel/parser';
 import traverseModule from '@babel/traverse';
+import { Logger } from '../../utils/logger.js';
 
 // Correctly type the traverse function
 const traverse = traverseModule;
@@ -61,7 +62,7 @@ function hasJSXSyntax(filePath: string): boolean {
 
     return hasJSX;
   } catch (error) {
-    console.error('Error While checking for JSX:', error);
+    Logger.Error(`Error While checking for JSX: ${error}`);
     return false;
   }
 }
@@ -73,7 +74,7 @@ function hasJSXSyntax(filePath: string): boolean {
 export function renameToJSX(rootDirectory: string): void {
   const selectedFiles = findFiles(rootDirectory);
 
-  console.log('📋 Renaming Files to JSX...');
+  Logger.Info('Renaming Files to JSX...');
 
   selectedFiles.forEach((eachFile) => {
     if (hasJSXSyntax(eachFile)) {
@@ -85,5 +86,5 @@ export function renameToJSX(rootDirectory: string): void {
     }
   });
 
-  console.log('🎉 File renaming complete.');
+  Logger.Success('File renaming complete.');
 }
