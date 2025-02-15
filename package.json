@@ -1,6 +1,6 @@
 {
   "name": "@smallcase/bite",
-  "version": "1.3.7-beta.1",
+  "version": "1.3.7",
   "main": "index.js",
   "scripts": {
     "build": "rm -rf dist && tsc",
