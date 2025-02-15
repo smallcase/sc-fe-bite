@@ -34,6 +34,6 @@
     "url": "git@github.com:smallcase/sc-fe-bite.git"
   },
   "dependencies": {
-    "chalk": "^5.4.1"
+    "chalk": "^4.1.2"
   }
 }
