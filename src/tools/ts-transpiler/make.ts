@@ -136,14 +136,18 @@ function main() {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
+  if (args.includes('--clean')) {
+    fs.rmdirSync(outDir);
+  }
+
   if (args.includes('--watch')) {
     chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
       console.log('🔄 Detected changes, rebuilding...');
       startTransformation(srcDir, outDir);
     });
-  } else {
-    startTransformation(srcDir, outDir);
   }
+
+  startTransformation(srcDir, outDir);
 }
 
 main();
