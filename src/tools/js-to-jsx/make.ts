@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import * as babelParser from '@babel/parser';
 import traverseModule from '@babel/traverse';
-import { Logger } from '../../utils/logger.js';
+import { Logger } from '../../utils/logger';
 
 // Correctly type the traverse function
 const traverse = traverseModule;

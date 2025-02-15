@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2018"],
+    "target": "ESNext",
+    "module": "CommonJS",
+    "lib": ["ESNext"],
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
