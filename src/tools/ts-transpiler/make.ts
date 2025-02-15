@@ -6,12 +6,14 @@ import path from 'path';
 import fs from 'fs';
 import chokidar from 'chokidar';
 import yoctoSpinner from 'yocto-spinner';
+import { fileURLToPath } from 'url';
+import chalk from 'chalk';
 
 // Internal modules
 import { renameToJSX } from '../js-to-jsx/make.js';
 import { Logger } from '../../utils/logger.js';
-import { fileURLToPath } from 'url';
-import chalk from 'chalk';
+import { debounce } from '../../utils/debounce.js';
+import packageJson from '../../../package.json' assert { type: 'json' };
 
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
@@ -144,6 +146,11 @@ function main() {
     process.exit(1);
   }
 
+  if (args.includes('--version')) {
+    Logger.Info(`TSX Transpiler v${packageJson.version}`);
+    process.exit(0);
+  }
+
   const srcDir = path.resolve(args[0]);
   const outDir = path.resolve(srcDir, '../dist');
 
@@ -163,9 +170,13 @@ function main() {
   }
 
   if (args.includes('--watch')) {
+    const debouncedTransformation = debounce(() => {
+      startTransformation(srcDir, outDir);
+    }, 500);
+
     chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
       Logger.Info('🔄 Detected changes, rebuilding...');
-      startTransformation(srcDir, outDir);
+      debouncedTransformation();
     });
   }
 
