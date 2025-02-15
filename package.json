@@ -10,7 +10,6 @@
   "bin": {
     "tsx-transpile": "./dist/tools/ts-transpiler/make.js"
   },
-  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
