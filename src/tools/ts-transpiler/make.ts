@@ -5,11 +5,13 @@ import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import chokidar from 'chokidar';
+import yoctoSpinner from 'yocto-spinner';
 
 // Internal modules
 import { renameToJSX } from '../js-to-jsx/make.js';
 import { Logger } from '../../utils/logger.js';
 import { fileURLToPath } from 'url';
+import chalk from 'chalk';
 
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
@@ -62,16 +64,19 @@ function generateDeclaration(srcDir: string, outDir: string) {
     fs.writeFileSync(tsConfigToUse, tsconfigContent);
   }
 
-  try {
-    Logger.Info(`Generating Type declarations for ${srcDir}`);
+  const spinner = yoctoSpinner({
+    text: chalk.blue(`Generating .d.ts files`),
+  }).start();
 
+  try {
     execSync(
       `npx tsc --emitDeclarationOnly --outDir ${outDir} --project ${tsConfigToUse}`,
       { stdio: 'inherit' }
     );
 
-    Logger.Success('Generated Type declarations');
+    spinner.success(chalk.green('Generated .d.ts files'));
   } catch (error) {
+    spinner.error(chalk.red('Generation of .d.ts failed'));
     Logger.Error(`Error generating declaration files: ${error}`);
   } finally {
     // Clear out temp tsconfig file once types are generated
@@ -87,13 +92,15 @@ function transformToJavascript(srcDir: string, outDir: string) {
     '../../../babel.config.json'
   )} --extensions ".ts,.tsx" --copy-files`;
 
+  const spinner = yoctoSpinner({
+    text: chalk.blue(`Transpiling ${srcDir}`),
+  }).start();
+
   try {
-    Logger.Info(`Transpiling files from ${srcDir}`);
-
     execSync(babelCmd, { stdio: 'inherit' });
-
-    Logger.Success('Transpilation completed!');
+    spinner.success(chalk.green('Transpilation completed!'));
   } catch (error) {
+    spinner.error(chalk.red('Transpilation completed!'));
     Logger.Error(`Error transpiling files:, ${error}`);
     process.exit(1);
   }

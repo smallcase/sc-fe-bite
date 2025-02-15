@@ -35,6 +35,7 @@
     "url": "git@github.com:smallcase/sc-fe-bite.git"
   },
   "dependencies": {
-    "chalk": "^5.4.1"
+    "chalk": "^5.4.1",
+    "yocto-spinner": "^0.2.0"
   }
 }
