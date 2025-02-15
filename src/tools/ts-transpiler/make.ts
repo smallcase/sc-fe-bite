@@ -3,6 +3,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { renameToJSX } from '../js-to-jsx/make';
 
 function generateDeclaration(srcDir: string, outDir: string) {
   const packageRoot = path.dirname(srcDir);
@@ -96,6 +97,8 @@ function transpile() {
     console.log('✅ Transpilation completed!');
 
     generateDeclaration(srcDir, outDir);
+
+    renameToJSX(outDir);
   } catch (error) {
     console.error('❌ Error transpiling files:', error);
     process.exit(1);
