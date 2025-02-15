@@ -9,6 +9,11 @@ import chokidar from 'chokidar';
 // Internal modules
 import { renameToJSX } from '../js-to-jsx/make.js';
 import { Logger } from '../../utils/logger.js';
+import { fileURLToPath } from 'url';
+
+// Manually define __dirname for ESM: FUCK YOU NODE
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * function to generate the declaration files for a given folder
@@ -139,7 +144,7 @@ function main() {
   }
 
   if (args.includes('--clean')) {
-    fs.rmdirSync(outDir);
+    fs.rmSync(outDir, { recursive: true, force: true });
   }
 
   if (args.includes('--watch')) {
