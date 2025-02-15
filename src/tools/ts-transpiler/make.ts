@@ -1,10 +1,19 @@
 #!/usr/bin/env node
 
+// Globals
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import chokidar from 'chokidar';
+
+// Internal modules
 import { renameToJSX } from '../js-to-jsx/make';
 
+/**
+ * function to generate the declaration files for a given folder
+ * @param srcDir - the path of the directory for which we need to generate .d.ts
+ * @param outDir - path where to output the generated declarations
+ */
 function generateDeclaration(srcDir: string, outDir: string) {
   const packageRoot = path.dirname(srcDir);
   const packageTsConfig = path.resolve(packageRoot, 'tsconfig.json');
@@ -49,10 +58,15 @@ function generateDeclaration(srcDir: string, outDir: string) {
 
   try {
     console.log(`🚀 Generating Type declarations for ${srcDir}`);
+
     execSync(
       `npx tsc --emitDeclarationOnly --outDir ${outDir} --project ${tsConfigToUse}`,
       { stdio: 'inherit' }
     );
+
+    console.log('✅ Generated Type declarations');
+  } catch (error) {
+    console.log('❌ Error generating declaration files', error);
   } finally {
     // Clear out temp tsconfig file once types are generated
     if (tempConfig) {
@@ -61,7 +75,45 @@ function generateDeclaration(srcDir: string, outDir: string) {
   }
 }
 
-function transpile() {
+function transformToJavascript(srcDir: string, outDir: string) {
+  const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --config-file ${path.resolve(
+    __dirname,
+    '../../../babel.config.json'
+  )} --extensions ".ts,.tsx" --copy-files`;
+
+  try {
+    console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
+
+    execSync(babelCmd, { stdio: 'inherit' });
+
+    console.log('✅ Transpilation completed!');
+  } catch (error) {
+    console.error('❌ Error transpiling files:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Wrapper function for calling all the steps in transformation
+ * @param srcDir - directory which needs to be transformed
+ * @param outDir - output directory
+ */
+function startTransformation(srcDir: string, outDir: string) {
+  try {
+    // Step 1. -> Transform Typescript to Javascript and copy all assets files
+    transformToJavascript(srcDir, outDir);
+
+    // Step 2. -> Generate Type declaration files
+    generateDeclaration(srcDir, outDir);
+
+    // Step 3. -> Rename js to jsx for better HMR support during development
+    renameToJSX(outDir);
+  } catch (error) {
+    console.error('❌ Error building package:', error);
+  }
+}
+
+function main() {
   // Get directory argument
   const args = process.argv.slice(2);
 
@@ -84,25 +136,14 @@ function transpile() {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
-  const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --config-file ${path.resolve(
-    __dirname,
-    '../../../babel.config.json'
-  )} --extensions ".ts,.tsx" --copy-files`;
-
-  try {
-    console.log(`Transpiling files from ${srcDir} to ${outDir}...`);
-
-    execSync(babelCmd, { stdio: 'inherit' });
-
-    console.log('✅ Transpilation completed!');
-
-    generateDeclaration(srcDir, outDir);
-
-    renameToJSX(outDir);
-  } catch (error) {
-    console.error('❌ Error transpiling files:', error);
-    process.exit(1);
+  if (args.includes('--watch')) {
+    chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
+      console.log('🔄 Detected changes, rebuilding...');
+      startTransformation(srcDir, outDir);
+    });
+  } else {
+    startTransformation(srcDir, outDir);
   }
 }
 
-transpile();
+main();
