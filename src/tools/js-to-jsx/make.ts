@@ -4,10 +4,10 @@ import fs from 'fs';
 import path from 'path';
 import * as babelParser from '@babel/parser';
 import traverseModule from '@babel/traverse';
-import { Logger } from '../../utils/logger';
+import { Logger } from '../../utils/logger.js';
 
 // Correctly type the traverse function
-const traverse = traverseModule;
+const traverse = traverseModule.default;
 
 const fileExtensions = ['.js', '.ts'];
 

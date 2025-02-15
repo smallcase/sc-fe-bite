@@ -7,8 +7,8 @@ import fs from 'fs';
 import chokidar from 'chokidar';
 
 // Internal modules
-import { renameToJSX } from '../js-to-jsx/make';
-import { Logger } from '../../utils/logger';
+import { renameToJSX } from '../js-to-jsx/make.js';
+import { Logger } from '../../utils/logger.js';
 
 /**
  * function to generate the declaration files for a given folder

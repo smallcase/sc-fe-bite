@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "module": "CommonJS",
-    "lib": ["ES2015"],
-    "declaration": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2020",
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
