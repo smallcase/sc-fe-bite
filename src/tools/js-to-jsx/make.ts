@@ -77,6 +77,10 @@ export function renameToJSX(rootDirectory: string): void {
   const selectedFiles = findFiles(rootDirectory);
 
   const spinner = yoctoSpinner({
+    spinner: {
+      interval: 125,
+      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
+    },
     text: chalk.blue(`Renaming Files to JSX...`),
   }).start();
 
@@ -90,5 +94,5 @@ export function renameToJSX(rootDirectory: string): void {
     }
   });
 
-  spinner.success('Renamed Files');
+  spinner.success(chalk.green('Renamed Files'));
 }

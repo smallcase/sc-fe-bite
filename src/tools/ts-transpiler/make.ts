@@ -65,6 +65,10 @@ function generateDeclaration(srcDir: string, outDir: string) {
   }
 
   const spinner = yoctoSpinner({
+    spinner: {
+      interval: 125,
+      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
+    },
     text: chalk.blue(`Generating .d.ts files`),
   }).start();
 
@@ -93,7 +97,11 @@ function transformToJavascript(srcDir: string, outDir: string) {
   )} --extensions ".ts,.tsx" --copy-files`;
 
   const spinner = yoctoSpinner({
-    text: chalk.blue(`Transpiling ${srcDir}`),
+    spinner: {
+      interval: 125,
+      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
+    },
+    text: chalk.blue(`Transpiling Tsx to JS`),
   }).start();
 
   try {
