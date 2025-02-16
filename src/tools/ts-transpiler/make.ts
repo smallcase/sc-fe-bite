@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 // Globals
+import { transformSync } from '@babel/core';
 import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -18,6 +19,50 @@ import packageJson from '../../../package.json' assert { type: 'json' };
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Transpile a single TypeScript file using Babel (in-memory)
+ * @param srcPath - Source file path
+ * @param outPath - Output file path
+ */
+function transpileFile(srcPath: string, outPath: string) {
+  const code = fs.readFileSync(srcPath, 'utf8');
+  const result = transformSync(code, {
+    filename: srcPath,
+    configFile: path.resolve(__dirname, '../../../babel.config.json'),
+  });
+
+  if (result?.code) {
+    fs.writeFileSync(
+      outPath.replace('.tsx', '.jsx').replace('.ts', '.js'),
+      result.code,
+      'utf8'
+    );
+  }
+}
+
+/**
+ * Recursively process all `.ts` and `.tsx` files in a directory
+ * @param srcDir - The directory containing TypeScript files
+ * @param outDir - The output directory for transpiled files
+ */
+function transpileDirectory(srcDir: string, outDir: string) {
+  fs.mkdirSync(outDir, { recursive: true });
+
+  fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
+    const srcPath = path.join(srcDir, entry.name);
+    const outPath = path.join(outDir, entry.name);
+
+    if (entry.isDirectory()) {
+      transpileDirectory(srcPath, outPath);
+    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+      transpileFile(srcPath, outPath);
+    } else {
+      // Copy asset files as-is
+      fs.copyFileSync(srcPath, outPath);
+    }
+  });
+}
 
 /**
  * function to generate the declaration files for a given folder
@@ -124,13 +169,14 @@ function transformToJavascript(srcDir: string, outDir: string) {
 function startTransformation(srcDir: string, outDir: string) {
   try {
     // Step 1. -> Transform Typescript to Javascript and copy all assets files
-    transformToJavascript(srcDir, outDir);
+    transpileDirectory(srcDir, outDir);
+    // transformToJavascript(srcDir, outDir);
 
     // Step 2. -> Generate Type declaration files
     generateDeclaration(srcDir, outDir);
 
     // Step 3. -> Rename js to jsx for better HMR support during development
-    renameToJSX(outDir);
+    // renameToJSX(outDir);
   } catch (error) {
     Logger.Error(`Error building package:, ${error}`);
     process.exit(1);
