@@ -94,3 +94,19 @@
 //     process.exit(1);
 //   }
 // }
+
+// function startTransformation(srcDir: string, outDir: string) {
+//   try {
+//     // Step 1. -> Transform Typescript to Javascript and copy all assets files
+//     transformToJavascript(srcDir, outDir);
+
+//     // Step 2. -> Generate Type declaration files
+//     generateDeclaration(srcDir, outDir);
+
+//     // Step 3. -> Rename js to jsx for better HMR support during development
+//     renameToJSX(outDir);
+//   } catch (error) {
+//     Logger.Error(`Error building package:, ${error}`);
+//     process.exit(1);
+//   }
+// }

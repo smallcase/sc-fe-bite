@@ -2,9 +2,8 @@
 
 // Globals
 import { transformSync } from '@babel/core';
-import { execSync } from 'child_process';
 import path from 'path';
-import fs, { read } from 'fs';
+import fs from 'fs';
 import chokidar from 'chokidar';
 import yoctoSpinner from 'yocto-spinner';
 import { fileURLToPath } from 'url';
@@ -46,8 +45,8 @@ function transpileFile(srcPath: string, outPath: string) {
  * @param outDir - The output directory for transpiled files
  */
 function transpileDirectory(srcDir: string, outDir: string) {
+  // ! Don't remove this, this will create the nested directory
   fs.mkdirSync(outDir, { recursive: true });
-
   fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
     const srcPath = path.join(srcDir, entry.name);
     const outPath = path.join(outDir, entry.name);
@@ -100,16 +99,8 @@ function generateDeclarationsNatively(srcDir: string, outDir: string) {
     target: ts.ScriptTarget.ESNext,
   });
 
-  const spinner = yoctoSpinner({
-    spinner: { interval: 125, frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'] },
-    text: chalk.blue(`Generating .d.ts files`),
-  }).start();
-
   const result = program.emit();
-  if (result.diagnostics.length === 0) {
-    spinner.success(chalk.green('Generated .d.ts files'));
-  } else {
-    spinner.error(chalk.red('Failed to generate .d.ts files'));
+  if (result.diagnostics.length !== 0) {
     Logger.Error(`Error generating declaration files:, ${result.diagnostics}`);
   }
 }
@@ -119,21 +110,28 @@ function generateDeclarationsNatively(srcDir: string, outDir: string) {
  * @param srcDir - directory which needs to be transformed
  * @param outDir - output directory
  */
-function startTransformation(srcDir: string, outDir: string) {
+async function startTransformation(srcDir: string, outDir: string) {
+  const spinner = yoctoSpinner({
+    spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
+    text: chalk.blue('🐬 Transformation started!'),
+  }).start();
+
   try {
     // Step 1. -> Transform Typescript to Javascript and copy all assets files
-    transpileDirectory(srcDir, outDir);
-    // transformToJavascript(srcDir, outDir);
+    await Promise.all([
+      transpileDirectory(srcDir, outDir),
+      generateDeclarationsNatively(srcDir, outDir),
+    ]);
 
+    spinner.success('🦄 Transformation completed!');
     // Step 2. -> Generate Type declaration files
-    // generateDeclaration(srcDir, outDir);
-    // measureExecutionTime('Generating .d.ts', () =>
-    generateDeclarationsNatively(srcDir, outDir);
-    // );
-
-    // Step 3. -> Rename js to jsx for better HMR support during development
-    // renameToJSX(outDir);
   } catch (error) {
+    //If process has failed clean out the build directory
+    if (fs.existsSync(outDir)) {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+
+    spinner.error('🐛 Transformation failed!');
     Logger.Error(`Error building package:, ${error}`);
     process.exit(1);
   }
@@ -162,13 +160,13 @@ function main() {
     process.exit(1);
   }
 
+  if (args.includes('--clean') && fs.existsSync(outDir)) {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+
   // Ensure output directory exists
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
-  }
-
-  if (args.includes('--clean')) {
-    fs.rmSync(outDir, { recursive: true, force: true });
   }
 
   if (args.includes('--watch')) {
