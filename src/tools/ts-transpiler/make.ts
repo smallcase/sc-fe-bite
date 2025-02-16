@@ -4,14 +4,13 @@
 import { transformSync } from '@babel/core';
 import { execSync } from 'child_process';
 import path from 'path';
-import fs from 'fs';
+import fs, { read } from 'fs';
 import chokidar from 'chokidar';
 import yoctoSpinner from 'yocto-spinner';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import ts from 'typescript';
 
-// Internal modules
-import { renameToJSX } from '../js-to-jsx/make.js';
 import { Logger } from '../../utils/logger.js';
 import { debounce } from '../../utils/debounce.js';
 import packageJson from '../../../package.json' assert { type: 'json' };
@@ -64,100 +63,54 @@ function transpileDirectory(srcDir: string, outDir: string) {
   });
 }
 
+function getAllTsFiles(srcDir: string): string[] {
+  let results: string[] = [];
+
+  fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
+    const srcPath = path.join(srcDir, entry.name);
+
+    if (entry.isDirectory()) {
+      results = results.concat(getAllTsFiles(srcPath)); // Recursive call
+    } else if (srcPath.endsWith('.ts') || srcPath.endsWith('.tsx')) {
+      results.push(srcPath);
+    }
+  });
+
+  return results;
+}
+
 /**
- * function to generate the declaration files for a given folder
- * @param srcDir - the path of the directory for which we need to generate .d.ts
- * @param outDir - path where to output the generated declarations
+ * Generate TypeScript declaration files in-memory
+ * @param srcDir - The path of the directory for which we need to generate .d.ts
+ * @param outDir - Path where to output the generated declarations
  */
-function generateDeclaration(srcDir: string, outDir: string) {
-  const packageRoot = path.dirname(srcDir);
-  const packageTsConfig = path.resolve(packageRoot, 'tsconfig.json');
-  const globalPackageConfig = path.resolve(
-    __dirname,
-    '../tsconfig.package.json'
-  );
+function generateDeclarationsNatively(srcDir: string, outDir: string) {
+  const files = getAllTsFiles(srcDir);
 
-  // Base Ts File which will be copied over to package
-  const tsconfigContent = JSON.stringify(
-    {
-      compilerOptions: {
-        outDir: outDir,
-        target: 'ESNext',
-        strict: true,
-        esModuleInterop: true,
-        declaration: true,
-        declarationMap: true,
-        emitDeclarationOnly: true,
-        skipLibCheck: true,
-        jsx: 'preserve',
-      },
-      include: [srcDir],
-    },
-    null,
-    2
-  );
-
-  let tsConfigToUse: string;
-  let tempConfig = false;
-
-  if (fs.existsSync(packageTsConfig)) {
-    tsConfigToUse = packageTsConfig;
-  } else if (fs.existsSync(globalPackageConfig)) {
-    tsConfigToUse = globalPackageConfig;
-  } else {
-    // If package doesn't have a ts config then add a temporary config to generate the declaration files
-    tsConfigToUse = path.join(packageRoot, 'tsconfig.temp.json');
-    tempConfig = true;
-    fs.writeFileSync(tsConfigToUse, tsconfigContent);
-  }
+  const program = ts.createProgram(files, {
+    outDir: outDir,
+    strict: true,
+    esModuleInterop: true,
+    declaration: true,
+    declarationMap: true,
+    emitDeclarationOnly: true,
+    skipLibCheck: true,
+    rootDir: srcDir,
+    jsx: ts.JsxEmit.Preserve,
+    target: ts.ScriptTarget.ESNext,
+  });
 
   const spinner = yoctoSpinner({
-    spinner: {
-      interval: 125,
-      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
-    },
+    spinner: { interval: 125, frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'] },
     text: chalk.blue(`Generating .d.ts files`),
   }).start();
 
-  try {
-    execSync(
-      `npx tsc --emitDeclarationOnly --outDir ${outDir} --project ${tsConfigToUse}`,
-      { stdio: 'inherit' }
-    );
-
+  const result = program.emit();
+  if (result.diagnostics.length === 0) {
     spinner.success(chalk.green('Generated .d.ts files'));
-  } catch (error) {
-    spinner.error(chalk.red('Generation of .d.ts failed'));
-    Logger.Error(`Error generating declaration files: ${error}`);
-  } finally {
-    // Clear out temp tsconfig file once types are generated
-    if (tempConfig) {
-      fs.unlinkSync(tsConfigToUse);
-    }
-  }
-}
-
-function transformToJavascript(srcDir: string, outDir: string) {
-  const babelCmd = `npx babel ${srcDir} --out-dir ${outDir} --config-file ${path.resolve(
-    __dirname,
-    '../../../babel.config.json'
-  )} --extensions ".ts,.tsx" --copy-files`;
-
-  const spinner = yoctoSpinner({
-    spinner: {
-      interval: 125,
-      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
-    },
-    text: chalk.blue(`Transpiling Tsx to JS`),
-  }).start();
-
-  try {
-    execSync(babelCmd, { stdio: 'inherit' });
-    spinner.success(chalk.green('Transpilation completed!'));
-  } catch (error) {
-    spinner.error(chalk.red('Transpilation completed!'));
-    Logger.Error(`Error transpiling files:, ${error}`);
-    process.exit(1);
+  } else {
+    spinner.error(chalk.red('Failed to generate .d.ts files'));
+    Logger.Error(`Error generating declaration files:, ${result.diagnostics}`);
   }
 }
 
@@ -173,7 +126,10 @@ function startTransformation(srcDir: string, outDir: string) {
     // transformToJavascript(srcDir, outDir);
 
     // Step 2. -> Generate Type declaration files
-    generateDeclaration(srcDir, outDir);
+    // generateDeclaration(srcDir, outDir);
+    // measureExecutionTime('Generating .d.ts', () =>
+    generateDeclarationsNatively(srcDir, outDir);
+    // );
 
     // Step 3. -> Rename js to jsx for better HMR support during development
     // renameToJSX(outDir);
