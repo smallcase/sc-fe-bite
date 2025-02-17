@@ -13,17 +13,18 @@ import ts from 'typescript';
 import { Logger } from '../../utils/logger.js';
 import { debounce } from '../../utils/debounce.js';
 import packageJson from '../../../package.json' assert { type: 'json' };
+import { defineCommand, runMain } from 'citty';
 
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Transpile a single TypeScript file using Babel (in-memory)
+ * Transform a single TypeScript file using Babel (in-memory)
  * @param srcPath - Source file path
  * @param outPath - Output file path
  */
-function transpileFile(srcPath: string, outPath: string) {
+function transformFile(srcPath: string, outPath: string) {
   const code = fs.readFileSync(srcPath, 'utf8');
   const result = transformSync(code, {
     filename: srcPath,
@@ -42,9 +43,9 @@ function transpileFile(srcPath: string, outPath: string) {
 /**
  * Recursively process all `.ts` and `.tsx` files in a directory
  * @param srcDir - The directory containing TypeScript files
- * @param outDir - The output directory for transpiled files
+ * @param outDir - The output directory for transformed files
  */
-function transpileDirectory(srcDir: string, outDir: string) {
+function transformDirectory(srcDir: string, outDir: string) {
   // ! Don't remove this, this will create the nested directory
   fs.mkdirSync(outDir, { recursive: true });
   fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
@@ -52,9 +53,9 @@ function transpileDirectory(srcDir: string, outDir: string) {
     const outPath = path.join(outDir, entry.name);
 
     if (entry.isDirectory()) {
-      transpileDirectory(srcPath, outPath);
+      transformDirectory(srcPath, outPath);
     } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
-      transpileFile(srcPath, outPath);
+      transformFile(srcPath, outPath);
     } else {
       // Copy asset files as-is
       fs.copyFileSync(srcPath, outPath);
@@ -100,6 +101,7 @@ function generateDeclarationsNatively(srcDir: string, outDir: string) {
   });
 
   const result = program.emit();
+
   if (result.diagnostics.length !== 0) {
     Logger.Error(`Error generating declaration files:, ${result.diagnostics}`);
   }
@@ -119,7 +121,7 @@ async function startTransformation(srcDir: string, outDir: string) {
   try {
     // Step 1. -> Transform Typescript to Javascript and copy all assets files
     await Promise.all([
-      transpileDirectory(srcDir, outDir),
+      transformDirectory(srcDir, outDir),
       generateDeclarationsNatively(srcDir, outDir),
     ]);
 
@@ -137,50 +139,66 @@ async function startTransformation(srcDir: string, outDir: string) {
   }
 }
 
-function main() {
-  // Get directory argument
-  const args = process.argv.slice(2);
+const cli = defineCommand({
+  meta: {
+    name: 'tsx:transform',
+    description: 'A CLI to transform TypeScript/TSX files to JavaScript.',
+    version: packageJson.version,
+  },
+  args: {
+    src: {
+      type: 'string',
+      description: 'Path to the source directory',
+      required: true,
+    },
+    dist: {
+      type: 'string',
+      description: 'Path to dist directory',
+    },
+    watch: {
+      type: 'boolean',
+      description: 'Enable watch mode',
+      alias: 'w',
+    },
+    clean: {
+      type: 'boolean',
+      description: 'Clean the output directory before transpiling',
+    },
+    version: {
+      type: 'boolean',
+      description: 'Show the CLI version',
+    },
+  },
+  async run({ args }) {
+    const srcDir = path.resolve(args.src);
+    const outDir = args.dist ?? path.resolve(srcDir, '../dist');
 
-  if (args.length === 0) {
-    Logger.Error('Usage: tsx-transpile <src-dir>');
-    process.exit(1);
-  }
+    if (!fs.existsSync(srcDir)) {
+      Logger.Error(`Error: Source directory "${srcDir}" does not exist.`);
+      process.exit(1);
+    }
 
-  if (args.includes('--version')) {
-    Logger.Info(`TSX Transpiler v${packageJson.version}`);
-    process.exit(0);
-  }
+    if (args.clean) {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
 
-  const srcDir = path.resolve(args[0]);
-  const outDir = path.resolve(srcDir, '../dist');
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
 
-  // Ensure source directory exists
-  if (!fs.existsSync(srcDir)) {
-    Logger.Error(`Error: Source directory "${srcDir}" does not exist.`);
-    process.exit(1);
-  }
+    startTransformation(srcDir, outDir);
 
-  if (args.includes('--clean') && fs.existsSync(outDir)) {
-    fs.rmSync(outDir, { recursive: true, force: true });
-  }
+    if (args.watch) {
+      const debouncedTransformation = debounce(() => {
+        startTransformation(srcDir, outDir);
+      }, 500);
 
-  // Ensure output directory exists
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
-  }
+      chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
+        Logger.Info('🔄 Detected changes, rebuilding...');
+        debouncedTransformation();
+      });
+    }
+  },
+});
 
-  if (args.includes('--watch')) {
-    const debouncedTransformation = debounce(() => {
-      startTransformation(srcDir, outDir);
-    }, 500);
-
-    chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
-      Logger.Info('🔄 Detected changes, rebuilding...');
-      debouncedTransformation();
-    });
-  }
-
-  startTransformation(srcDir, outDir);
-}
-
-main();
+runMain(cli);

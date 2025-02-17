@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "tsx-transpile": "./dist/tools/ts-transpiler/make.js"
+    "tsx:transform": "./dist/tools/ts-transformer/make.js"
   },
   "type": "module",
   "keywords": [],
@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "chalk": "^5.4.1",
+    "citty": "^0.1.6",
     "yocto-spinner": "^0.2.0"
   }
 }
