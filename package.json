@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "tsx:transform": "./dist/tools/ts-transformer/make.js"
+    "tsx-transform": "./dist/tools/ts-transformer/make.js"
   },
   "type": "module",
   "keywords": [],

@@ -24,16 +24,23 @@ const __dirname = path.dirname(__filename);
  * @param srcPath - Source file path
  * @param outPath - Output file path
  */
-function transformFile(srcPath: string, outPath: string) {
-  const code = fs.readFileSync(srcPath, 'utf8');
+function transformFile(params: {
+  srcPath: string;
+  outPath: string;
+  babelConfig?: string;
+}) {
+  const code = fs.readFileSync(params.srcPath, 'utf8');
+
   const result = transformSync(code, {
-    filename: srcPath,
-    configFile: path.resolve(__dirname, '../../../babel.config.json'),
+    filename: params.srcPath,
+    configFile:
+      params.babelConfig ??
+      path.resolve(__dirname, '../../../babel.config.json'),
   });
 
   if (result?.code) {
     fs.writeFileSync(
-      outPath.replace('.tsx', '.jsx').replace('.ts', '.js'),
+      params.outPath.replace('.tsx', '.jsx').replace('.ts', '.js'),
       result.code,
       'utf8'
     );
@@ -45,17 +52,29 @@ function transformFile(srcPath: string, outPath: string) {
  * @param srcDir - The directory containing TypeScript files
  * @param outDir - The output directory for transformed files
  */
-function transformDirectory(srcDir: string, outDir: string) {
+function transformDirectory(params: {
+  srcDir: string;
+  outDir: string;
+  babelConfig?: string;
+}) {
   // ! Don't remove this, this will create the nested directory
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
-    const srcPath = path.join(srcDir, entry.name);
-    const outPath = path.join(outDir, entry.name);
+  fs.mkdirSync(params.outDir, { recursive: true });
+  fs.readdirSync(params.srcDir, { withFileTypes: true }).forEach((entry) => {
+    const srcPath = path.join(params.srcDir, entry.name);
+    const outPath = path.join(params.outDir, entry.name);
 
     if (entry.isDirectory()) {
-      transformDirectory(srcPath, outPath);
+      transformDirectory({
+        srcDir: srcPath,
+        outDir: outPath,
+        babelConfig: params.babelConfig,
+      });
     } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
-      transformFile(srcPath, outPath);
+      transformFile({
+        srcPath,
+        outPath,
+        babelConfig: params.babelConfig,
+      });
     } else {
       // Copy asset files as-is
       fs.copyFileSync(srcPath, outPath);
@@ -84,18 +103,34 @@ function getAllTsFiles(srcDir: string): string[] {
  * @param srcDir - The path of the directory for which we need to generate .d.ts
  * @param outDir - Path where to output the generated declarations
  */
-function generateDeclarationsNatively(srcDir: string, outDir: string) {
-  const files = getAllTsFiles(srcDir);
+function generateDeclarationsNatively(params: {
+  srcDir: string;
+  outDir: string;
+  tsConfig?: string;
+}) {
+  const files = getAllTsFiles(params.srcDir);
 
-  const program = ts.createProgram(files, {
-    outDir: outDir,
+  let compilerOptions: ts.CompilerOptions = {
+    outDir: params.outDir,
     strict: true,
     esModuleInterop: true,
     declaration: true,
     declarationMap: true,
     emitDeclarationOnly: true,
     skipLibCheck: true,
-    rootDir: srcDir,
+    rootDir: params.srcDir,
+    jsx: ts.JsxEmit.Preserve,
+    target: ts.ScriptTarget.ESNext,
+  };
+
+  if (params.tsConfig && fs.existsSync(params.tsConfig)) {
+    compilerOptions = JSON.parse(
+      fs.readFileSync(params.tsConfig, 'utf8')
+    ).compilerOptions;
+  }
+
+  const program = ts.createProgram(files, {
+    ...compilerOptions,
     jsx: ts.JsxEmit.Preserve,
     target: ts.ScriptTarget.ESNext,
   });
@@ -112,7 +147,12 @@ function generateDeclarationsNatively(srcDir: string, outDir: string) {
  * @param srcDir - directory which needs to be transformed
  * @param outDir - output directory
  */
-async function startTransformation(srcDir: string, outDir: string) {
+async function startTransformation(params: {
+  srcDir: string;
+  outDir: string;
+  tsConfig?: string;
+  babelConfig?: string;
+}) {
   const spinner = yoctoSpinner({
     spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
     text: chalk.blue('🐬 Transformation started!'),
@@ -121,16 +161,24 @@ async function startTransformation(srcDir: string, outDir: string) {
   try {
     // Step 1. -> Transform Typescript to Javascript and copy all assets files
     await Promise.all([
-      transformDirectory(srcDir, outDir),
-      generateDeclarationsNatively(srcDir, outDir),
+      transformDirectory({
+        srcDir: params.srcDir,
+        outDir: params.outDir,
+        babelConfig: params.babelConfig,
+      }),
+      generateDeclarationsNatively({
+        srcDir: params.srcDir,
+        outDir: params.outDir,
+        tsConfig: params.tsConfig,
+      }),
     ]);
 
     spinner.success('🦄 Transformation completed!');
     // Step 2. -> Generate Type declaration files
   } catch (error) {
     //If process has failed clean out the build directory
-    if (fs.existsSync(outDir)) {
-      fs.rmSync(outDir, { recursive: true, force: true });
+    if (fs.existsSync(params.outDir)) {
+      fs.rmSync(params.outDir, { recursive: true, force: true });
     }
 
     spinner.error('🐛 Transformation failed!');
@@ -168,6 +216,14 @@ const cli = defineCommand({
       type: 'boolean',
       description: 'Show the CLI version',
     },
+    tsConfig: {
+      type: 'string',
+      description: 'Path to custom ts config',
+    },
+    babelConfig: {
+      type: 'string',
+      description: 'Path to custom babel config',
+    },
   },
   async run({ args }) {
     const srcDir = path.resolve(args.src);
@@ -186,17 +242,30 @@ const cli = defineCommand({
       fs.mkdirSync(outDir, { recursive: true });
     }
 
-    startTransformation(srcDir, outDir);
+    startTransformation({
+      srcDir,
+      outDir,
+      babelConfig: args.babelConfig,
+      tsConfig: args.tsConfig,
+    });
 
     if (args.watch) {
       const debouncedTransformation = debounce(() => {
-        startTransformation(srcDir, outDir);
+        startTransformation({
+          srcDir,
+          outDir,
+          babelConfig: args.babelConfig,
+          tsConfig: args.tsConfig,
+        });
       }, 500);
 
       chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
         Logger.Info('🔄 Detected changes, rebuilding...');
         debouncedTransformation();
       });
+
+      // HACK TO MAKE STORYBOOK AND WATCH MODE WORK => Figure out later to use with concurrently
+      process.exit(1);
     }
   },
 });
