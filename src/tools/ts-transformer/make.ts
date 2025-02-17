@@ -152,10 +152,13 @@ async function startTransformation(params: {
   outDir: string;
   tsConfig?: string;
   babelConfig?: string;
+  witty: boolean;
 }) {
   const spinner = yoctoSpinner({
     spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
-    text: chalk.blue('🐬 Transformation started!'),
+    text: chalk.blue(
+      params.witty ? "🐬 Don't Panic, Too late" : '🐬 Transformation started!'
+    ),
   }).start();
 
   try {
@@ -173,7 +176,11 @@ async function startTransformation(params: {
       }),
     ]);
 
-    spinner.success('🦄 Transformation completed!');
+    spinner.success(
+      params.witty
+        ? '🦄 Generated Mostly Harmless JS files'
+        : '🦄 Transformation completed!'
+    );
     // Step 2. -> Generate Type declaration files
   } catch (error) {
     //If process has failed clean out the build directory
@@ -181,7 +188,11 @@ async function startTransformation(params: {
       fs.rmSync(params.outDir, { recursive: true, force: true });
     }
 
-    spinner.error('🐛 Transformation failed!');
+    spinner.error(
+      params.witty
+        ? '🦄 What the photon did you just wrote ?'
+        : '🐛 Transformation failed!'
+    );
     Logger.Error(`Error building package:, ${error}`);
     process.exit(1);
   }
@@ -224,6 +235,10 @@ const cli = defineCommand({
       type: 'string',
       description: 'Path to custom babel config',
     },
+    witty: {
+      type: 'boolean',
+      description: 'Try it out!',
+    },
   },
   async run({ args }) {
     const srcDir = path.resolve(args.src);
@@ -247,6 +262,7 @@ const cli = defineCommand({
       outDir,
       babelConfig: args.babelConfig,
       tsConfig: args.tsConfig,
+      witty: args.witty,
     });
 
     if (args.watch) {
@@ -256,6 +272,7 @@ const cli = defineCommand({
           outDir,
           babelConfig: args.babelConfig,
           tsConfig: args.tsConfig,
+          witty: args.witty,
         });
       }, 500);
 
