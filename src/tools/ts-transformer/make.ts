@@ -189,7 +189,7 @@ async function startTransformation(params: {
 
 const cli = defineCommand({
   meta: {
-    name: 'tsx:transform',
+    name: 'tsx-transform',
     description: 'A CLI to transform TypeScript/TSX files to JavaScript.',
     version: packageJson.version,
   },
