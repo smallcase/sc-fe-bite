@@ -282,7 +282,7 @@ const cli = defineCommand({
       });
 
       // HACK TO MAKE STORYBOOK AND WATCH MODE WORK => Figure out later to use with concurrently
-      process.exit(1);
+      // process.exit(0);
     }
   },
 });
