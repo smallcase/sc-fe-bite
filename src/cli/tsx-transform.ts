@@ -6,12 +6,12 @@ import fs from 'fs';
 import chokidar from 'chokidar';
 
 import { debounce } from '../utils/debounce.js';
-import packageJson from '../../package.json' with { type: 'json' };
+// @ts-ignore
+import packageJson from '../../package.json' assert { type: 'json' };
 import { defineCommand, runMain } from 'citty';
 
 import { Logger } from '../utils/logger.js';
 import { startTransformation } from '../tools/ts-transformer/make.js';
-
 
 const cli = defineCommand({
   meta: {
