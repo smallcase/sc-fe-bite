@@ -4,18 +4,19 @@
 
 ## Features
 
-- Transforms `.ts` and `.tsx` files to `.js` and `.jsx` using Babel
+- Transforms `.ts` and `.tsx` files to `.js` and `.jsx` using `Babel`
 - Generates TypeScript declaration files (`.d.ts`)
 - Supports a custom Babel and TypeScript configuration
 - Watch mode for automatic re-transpilation on file changes
 - Cleans the output directory before transpiling (optional)
 - Works seamlessly within a monorepo setup
 - Lightweight and fast with debounced file watching
+- Includes a "witty" mode for fun logging messages
 
 ## Installation
 
 ```sh
-npm install -g tsx-transform
+npm install -g @smallcase/bite
 ```
 
 ## Usage
@@ -23,20 +24,21 @@ npm install -g tsx-transform
 ### Basic Command
 
 ```sh
-tsx-transform --src ./src --dist ./dist
+tsx-transform --src ./lib --dist ./dist
 ```
 
 ### Options
 
 | Option          | Alias | Type    | Description                                     | Required |
 | --------------- | ----- | ------- | ----------------------------------------------- | -------- |
-| `--src`         |       | string  | Path to the source directory                    | ✅ Yes   |
+| `--src`         |       | string  | Path to the source directory (default: `src/`)  | ❌ No    |
 | `--dist`        |       | string  | Path to the output directory (default: `dist/`) | ❌ No    |
 | `--watch`       | `-w`  | boolean | Enables watch mode                              | ❌ No    |
 | `--clean`       |       | boolean | Cleans the output directory before transpiling  | ❌ No    |
 | `--tsConfig`    |       | string  | Path to custom `tsconfig.json`                  | ❌ No    |
 | `--babelConfig` |       | string  | Path to custom `babel.config.json`              | ❌ No    |
 | `--version`     |       | boolean | Show CLI version                                | ❌ No    |
+| `--witty`       |       | boolean | Enables witty logging messages                  | ❌ No    |
 
 ## Examples
 
@@ -61,24 +63,31 @@ tsx-transform --src ./src --dist ./build --clean
 ### Use Custom TypeScript Config
 
 ```sh
-tsx-transform --src ./src --dist ./build --tsConfig ./tsconfig.custom.json
+tsx-transform --src ./lib --dist ./build --tsConfig ./tsconfig.custom.json
 ```
 
 ### Use Custom Babel Config
 
 ```sh
-tsx-transform --src ./src --dist ./build --babelConfig ./babel.custom.json
+tsx-transform --src ./lib --dist ./build --babelConfig ./babel.custom.json
+```
+
+### Enable Witty Logging
+
+```sh
+tsx-transform --src ./lib --dist ./build --witty
 ```
 
 ## Watch Mode
 
-When using `--watch`, the CLI will monitor the source directory for changes and automatically recompile files when modifications are detected.
+When using `--watch`, the CLI will monitor the source directory for changes and automatically recompile files when modifications are detected. The file-watching is debounced to prevent excessive rebuilds.
 
 ## Logging & Error Handling
 
 - Uses `Logger` for structured logging.
 - Displays errors clearly in case of transformation failure.
 - Cleans the output directory if transformation fails.
+- Supports an optional witty logging mode (`--witty`) for fun messages.
 
 ## License
 
