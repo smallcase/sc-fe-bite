@@ -5,9 +5,6 @@ import path from 'path';
 import * as babelParser from '@babel/parser';
 import traverseModule from '@babel/traverse';
 import { Logger } from '../../utils/logger.js';
-import yoctoSpinner from 'yocto-spinner';
-import chalk from 'chalk';
-
 // Correctly type the traverse function
 const traverse = traverseModule.default;
 
@@ -76,14 +73,6 @@ function hasJSXSyntax(filePath: string): boolean {
 export function renameToJSX(rootDirectory: string): void {
   const selectedFiles = findFiles(rootDirectory);
 
-  const spinner = yoctoSpinner({
-    spinner: {
-      interval: 125,
-      frames: ['∙∙∙', '●∙∙', '∙●∙', '∙∙●', '∙∙∙'],
-    },
-    text: chalk.blue(`Renaming Files to JSX...`),
-  }).start();
-
   selectedFiles.forEach((eachFile) => {
     if (hasJSXSyntax(eachFile)) {
       const jsxFile = eachFile.split('.').at(-1)?.includes('ts')
@@ -93,6 +82,4 @@ export function renameToJSX(rootDirectory: string): void {
       fs.renameSync(eachFile, jsxFile);
     }
   });
-
-  spinner.success(chalk.green('Renamed Files'));
 }

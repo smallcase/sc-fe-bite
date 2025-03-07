@@ -2,13 +2,7 @@
 import { transformSync } from '@babel/core';
 import path from 'path';
 import fs from 'fs';
-import chokidar from 'chokidar';
-import yoctoSpinner from 'yocto-spinner';
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
-import ts from 'typescript';
-
-import { Logger } from '../../utils/logger.js';
 
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +41,7 @@ function transformFile(params: {
  * @param srcDir - The directory containing TypeScript files
  * @param outDir - The output directory for transformed files
  */
-function transformDirectory(params: {
+function generateJavascriptFiles(params: {
   srcDir: string;
   outDir: string;
   babelConfig?: string;
@@ -59,7 +53,7 @@ function transformDirectory(params: {
     const outPath = path.join(params.outDir, entry.name);
 
     if (entry.isDirectory()) {
-      transformDirectory({
+      generateJavascriptFiles({
         srcDir: srcPath,
         outDir: outPath,
         babelConfig: params.babelConfig,
@@ -77,120 +71,4 @@ function transformDirectory(params: {
   });
 }
 
-function getAllTsFiles(srcDir: string): string[] {
-  let results: string[] = [];
-
-  fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
-    const srcPath = path.join(srcDir, entry.name);
-
-    if (entry.isDirectory()) {
-      results = results.concat(getAllTsFiles(srcPath)); // Recursive call
-    } else if (srcPath.endsWith('.ts') || srcPath.endsWith('.tsx')) {
-      results.push(srcPath);
-    }
-  });
-
-  return results;
-}
-
-/**
- * Generate TypeScript declaration files in-memory
- * @param srcDir - The path of the directory for which we need to generate .d.ts
- * @param outDir - Path where to output the generated declarations
- */
-function generateDeclarationsNatively(params: {
-  srcDir: string;
-  outDir: string;
-  tsConfig?: string;
-}) {
-  const files = getAllTsFiles(params.srcDir);
-
-  let compilerOptions: ts.CompilerOptions = {
-    outDir: params.outDir,
-    strict: true,
-    esModuleInterop: true,
-    declaration: true,
-    declarationMap: true,
-    emitDeclarationOnly: true,
-    skipLibCheck: true,
-    rootDir: params.srcDir,
-    jsx: ts.JsxEmit.Preserve,
-    target: ts.ScriptTarget.ESNext,
-  };
-
-  if (params.tsConfig && fs.existsSync(params.tsConfig)) {
-    compilerOptions = JSON.parse(
-      fs.readFileSync(params.tsConfig, 'utf8')
-    ).compilerOptions;
-  }
-
-  const program = ts.createProgram(files, {
-    ...compilerOptions,
-    jsx: ts.JsxEmit.Preserve,
-    target: ts.ScriptTarget.ESNext,
-  });
-
-  const result = program.emit();
-
-  if (result.diagnostics.length !== 0) {
-    Logger.Error(`Error generating declaration files:, ${result.diagnostics}`);
-  }
-}
-
-/**
- * Wrapper function for calling all the steps in transformation
- * @param srcDir - directory which needs to be transformed
- * @param outDir - output directory
- */
-async function startTransformation(params: {
-  srcDir: string;
-  outDir: string;
-  tsConfig?: string;
-  babelConfig?: string;
-  witty: boolean;
-}) {
-  const spinner = yoctoSpinner({
-    spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
-    text: chalk.blue(
-      params.witty ? "🐬 Don't Panic, Too late" : '🐬 Transformation started!'
-    ),
-  }).start();
-
-  try {
-    // Step 1. -> Transform Typescript to Javascript and copy all assets files
-    await Promise.all([
-      transformDirectory({
-        srcDir: params.srcDir,
-        outDir: params.outDir,
-        babelConfig: params.babelConfig,
-      }),
-      generateDeclarationsNatively({
-        srcDir: params.srcDir,
-        outDir: params.outDir,
-        tsConfig: params.tsConfig,
-      }),
-    ]);
-
-    spinner.success(
-      params.witty
-        ? '🦄 Generated Mostly Harmless JS files'
-        : '🦄 Transformation completed!'
-    );
-    // Step 2. -> Generate Type declaration files
-  } catch (error) {
-    //If process has failed clean out the build directory
-    if (fs.existsSync(params.outDir)) {
-      fs.rmSync(params.outDir, { recursive: true, force: true });
-    }
-
-    spinner.error(
-      params.witty
-        ? '🦄 What the photon did you just wrote ?'
-        : '🐛 Transformation failed!'
-    );
-    Logger.Error(`Error building package:, ${error}`);
-    process.exit(1);
-  }
-}
-
-export { startTransformation };
+export { generateJavascriptFiles };
