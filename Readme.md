@@ -1,6 +1,6 @@
 # TSX-Transform
 
-`tsx-transform` is a CLI tool designed to transpile TypeScript (`.ts` & `.tsx`) files into JavaScript using Babel while also generating TypeScript declaration files (`.d.ts`). It supports monorepos, watch mode, caching, and optimized TypeScript compilation.
+`bite` is a CLI tool designed to transform TypeScript (`.ts` & `.tsx`) files into JavaScript using Babel while also generating TypeScript declaration files (`.d.ts`). It supports monorepos, watch mode, caching, and optimized TypeScript compilation.
 
 ## Features
 
@@ -24,7 +24,7 @@ npm install -g @smallcase/bite
 ### Basic Command
 
 ```sh
-tsx-transform --src ./lib --dist ./dist
+bite:tsx:transform --src ./lib --dist ./dist
 ```
 
 ### Options
@@ -45,37 +45,37 @@ tsx-transform --src ./lib --dist ./dist
 ### Transform TypeScript Files
 
 ```sh
-tsx-transform --src ./src --dist ./build
+bite:tsx:transform  --src ./src --dist ./build
 ```
 
 ### Transform and Watch for Changes
 
 ```sh
-tsx-transform --src ./src --dist ./build --watch
+bite:tsx:transform  --src ./src --dist ./build --watch
 ```
 
 ### Clean Output Directory Before Transpiling
 
 ```sh
-tsx-transform --src ./src --dist ./build --clean
+bite:tsx:transform  --src ./src --dist ./build --clean
 ```
 
 ### Use Custom TypeScript Config
 
 ```sh
-tsx-transform --src ./lib --dist ./build --tsConfig ./tsconfig.custom.json
+bite:tsx:transform  --src ./lib --dist ./build --tsConfig ./tsconfig.custom.json
 ```
 
 ### Use Custom Babel Config
 
 ```sh
-tsx-transform --src ./lib --dist ./build --babelConfig ./babel.custom.json
+bite:tsx:transform  --src ./lib --dist ./build --babelConfig ./babel.custom.json
 ```
 
 ### Enable Witty Logging
 
 ```sh
-tsx-transform --src ./lib --dist ./build --witty
+bite:tsx:transform  --src ./lib --dist ./build --witty
 ```
 
 ## Watch Mode
@@ -92,3 +92,5 @@ When using `--watch`, the CLI will monitor the source directory for changes and 
 ## License
 
 MIT License.
+
+**NOTE** - The old command `tsx-transform` has been deprecated and will be removed in next major version

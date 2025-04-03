@@ -9,7 +9,9 @@
   },
   "bin": {
     "tsx-transform": "./dist/cli/tsx-transform.js",
-    "rename-to-jsx": "./dist/cli/rename-to-jsx.js"
+    "rename-to-jsx": "./dist/cli/rename-to-jsx.js",
+    "bite:tsx:transform": "./dist/cli/tsx-transform.js",
+    "bite:rename:jsx": "./dist/cli/rename-to-jsx.js"
   },
   "type": "module",
   "keywords": [],
