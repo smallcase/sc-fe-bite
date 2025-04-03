@@ -2,6 +2,7 @@
   "name": "@smallcase/bite",
   "version": "3.0.0",
   "main": "index.js",
+  "private": false,
   "scripts": {
     "build": "rm -rf dist && tsc",
     "prepublishOnly": "npm run build",
