@@ -8,15 +8,15 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "tsx-transform": "./dist/cli/tsx-transform.js",
-    "rename-to-jsx": "./dist/cli/rename-to-jsx.js",
-    "bite:tsx:transform": "./dist/cli/tsx-transform.js",
-    "bite:rename:jsx": "./dist/cli/rename-to-jsx.js"
+    "tsx-transform": "dist/cli/tsx-transform.js",
+    "rename-to-jsx": "dist/cli/rename-to-jsx.js",
+    "bite-tsx-transform": "dist/cli/tsx-transform.js",
+    "bite-rename-jsx": "dist/cli/rename-to-jsx.js"
   },
   "type": "module",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "",
   "devDependencies": {
     "@babel/cli": "^7.26.4",
@@ -36,7 +36,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:smallcase/sc-fe-bite.git"
+    "url": "git+ssh://git@github.com/smallcase/sc-fe-bite.git"
   },
   "dependencies": {
     "chalk": "^5.4.1",
