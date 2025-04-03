@@ -1,6 +1,6 @@
 {
   "name": "@smallcase/bite",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "main": "index.js",
   "private": false,
   "scripts": {
