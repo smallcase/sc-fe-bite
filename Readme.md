@@ -1,4 +1,4 @@
-# TSX-Transform
+# BITE
 
 `bite` is a CLI tool designed to transform TypeScript (`.ts` & `.tsx`) files into JavaScript using Babel while also generating TypeScript declaration files (`.d.ts`). It supports monorepos, watch mode, caching, and optimized TypeScript compilation.
 
