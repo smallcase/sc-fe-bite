@@ -16,7 +16,7 @@
 ## Installation
 
 ```sh
-npm install -g @smallcase/bite
+npm install @smallcase/bite
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ npm install -g @smallcase/bite
 ### Basic Command
 
 ```sh
-bite:tsx:transform --src ./lib --dist ./dist
+bite-tsx-transform --src ./lib --dist ./dist
 ```
 
 ### Options
@@ -45,37 +45,37 @@ bite:tsx:transform --src ./lib --dist ./dist
 ### Transform TypeScript Files
 
 ```sh
-bite:tsx:transform  --src ./src --dist ./build
+bite-tsx-transform  --src ./src --dist ./build
 ```
 
 ### Transform and Watch for Changes
 
 ```sh
-bite:tsx:transform  --src ./src --dist ./build --watch
+bite-tsx-transform  --src ./src --dist ./build --watch
 ```
 
 ### Clean Output Directory Before Transpiling
 
 ```sh
-bite:tsx:transform  --src ./src --dist ./build --clean
+bite-tsx-transform --src ./src --dist ./build --clean
 ```
 
 ### Use Custom TypeScript Config
 
 ```sh
-bite:tsx:transform  --src ./lib --dist ./build --tsConfig ./tsconfig.custom.json
+bite-tsx-transform  --src ./lib --dist ./build --tsConfig ./tsconfig.custom.json
 ```
 
 ### Use Custom Babel Config
 
 ```sh
-bite:tsx:transform  --src ./lib --dist ./build --babelConfig ./babel.custom.json
+bite-tsx-transform --src ./lib --dist ./build --babelConfig ./babel.custom.json
 ```
 
 ### Enable Witty Logging
 
 ```sh
-bite:tsx:transform  --src ./lib --dist ./build --witty
+bite-tsx-transform  --src ./lib --dist ./build --witty
 ```
 
 ## Watch Mode
