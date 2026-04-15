@@ -8,7 +8,7 @@ on:
 jobs:
   publish:
     name: Publish Package to GitHub Registry
-    runs-on: general-medium-ondemand-runner
+    runs-on: ubuntu-latest
     permissions: write-all
     env:
       GH_NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
