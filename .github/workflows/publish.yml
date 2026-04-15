@@ -2,55 +2,27 @@ name: Publish to GitHub Packages
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - '*'
 
 jobs:
   publish:
-    if: "!startsWith(github.event.head_commit.message, 'v')"
     name: Publish Package to GitHub Registry
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-
+    runs-on: general-medium-ondemand-runner
+    permissions: write-all
+    env:
+      GH_NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: '0'
-          token: ${{ secrets.CASE_PKG_WRITE }}
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://npm.pkg.github.com/
+      - name: Setup Volta
+        uses: volta-cli/action@v4
 
-      - run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
-      - name: Configure git
-        run: |
-          git config --global user.name "infra-bot"
-          git config --global user.email "infra@smallcase.com"
-
-      - name: Determine version bump
-        id: bump
-        run: |
-          MSG="${{ github.event.head_commit.message }}"
-          if echo "$MSG" | grep -qiE 'BREAKING CHANGE|^major'; then
-            echo "type=major" >> "$GITHUB_OUTPUT"
-          elif echo "$MSG" | grep -qiE '^feat'; then
-            echo "type=minor" >> "$GITHUB_OUTPUT"
-          else
-            echo "type=patch" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Bump version
-        run: npm version ${{ steps.bump.outputs.type }} -m "v%s"
-
-      - name: Push version commit and tag
-        run: git push origin master --tags
-
-      - name: Publish
+      - name: Publish to GitHub Packages
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.CASE_PKG_WRITE }}
+          CI: true
