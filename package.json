@@ -39,6 +39,9 @@
     "type": "git",
     "url": "git+ssh://git@github.com/smallcase/sc-fe-bite.git"
   },
+  "volta": {
+    "node": "24"
+  },
   "dependencies": {
     "chalk": "^5.4.1",
     "citty": "^0.1.6",
