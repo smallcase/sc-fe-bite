@@ -1,6 +1,6 @@
 {
   "name": "@smallcase/bite",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "main": "index.js",
   "private": false,
   "scripts": {
@@ -40,7 +40,7 @@
     "url": "git+ssh://git@github.com/smallcase/sc-fe-bite.git"
   },
   "volta": {
-    "node": "24"
+    "node": "24.14.1"
   },
   "dependencies": {
     "chalk": "^5.4.1",
