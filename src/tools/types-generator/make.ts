@@ -43,6 +43,7 @@ function generateDeclarationsNatively(params: {
     rootDir: params.srcDir,
     jsx: ts.JsxEmit.Preserve,
     target: ts.ScriptTarget.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
   };
 
   if (params.tsConfig && fs.existsSync(params.tsConfig)) {
