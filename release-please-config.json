@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "7608fc8832049d7412ffa970a2ec77539ad8f693",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "@smallcase/bite"
+    }
+  }
+}
