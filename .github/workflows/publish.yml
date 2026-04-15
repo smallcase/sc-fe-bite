@@ -1,18 +1,21 @@
 name: Publish to GitHub Packages
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    branches: [master]
+    types: [closed]
 
 jobs:
   publish:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CASE_PKG_WRITE }}
 
       - uses: actions/setup-node@v4
         with:
@@ -21,6 +24,30 @@ jobs:
 
       - run: npm ci
 
-      - run: npm publish
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          PR_LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if echo "$PR_LABELS" | grep -q '"major"'; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$PR_LABELS" | grep -q '"minor"'; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        run: npm version ${{ steps.bump.outputs.type }} -m "%s"
+
+      - name: Push version commit and tag
+        run: git push origin master --tags
+
+      - name: Publish
+        run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.CASE_PKG_WRITE }}
