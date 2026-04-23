@@ -6,7 +6,7 @@ import fs from 'fs';
 import chokidar from 'chokidar';
 
 // @ts-ignore
-import packageJson from '../../package.json' assert { type: 'json' };
+import packageJson from '../../package.json' with { type: 'json' };
 import { defineCommand, runMain } from 'citty';
 
 import { Logger } from '../utils/logger.js';
