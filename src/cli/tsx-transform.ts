@@ -5,28 +5,34 @@ import path from 'path';
 import fs from 'fs';
 import chokidar from 'chokidar';
 
-import { debounce } from '../utils/debounce.js';
 // @ts-ignore
 import packageJson from '../../package.json' assert { type: 'json' };
 import { defineCommand, runMain } from 'citty';
 
 import { Logger } from '../utils/logger.js';
-import { generateJavascriptFiles } from '../tools/ts-transformer/make.js';
-import { generateDeclarationsNatively } from '../tools/types-generator/make.js';
+import {
+  generateJavascriptFiles,
+  transformFile,
+  computeOutPath,
+  isTsSource,
+} from '../tools/ts-transformer/make.js';
+import {
+  generateDeclarationsNatively,
+  startTypesWatcher,
+} from '../tools/types-generator/make.js';
 import yoctoSpinner from 'yocto-spinner';
 import chalk from 'chalk';
 
-/**
- * Wrapper function for calling all the steps in transformation
- * @param srcDir - directory which needs to be transformed
- * @param outDir - output directory
- */
-async function startTransformation(params: {
+async function runInitialBuild(params: {
   srcDir: string;
   outDir: string;
   tsConfig?: string;
   babelConfig?: string;
-  witty: boolean;
+  witty?: boolean;
+  // In watch mode, skip the full declarations pass — the watch
+  // program's own initial emit covers it (and then handles
+  // incremental updates for each edit).
+  skipDeclarations?: boolean;
 }) {
   const spinner = yoctoSpinner({
     spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
@@ -36,40 +42,132 @@ async function startTransformation(params: {
   }).start();
 
   try {
-    // Step 1. -> Transform Typescript to Javascript and copy all assets files
-    await Promise.all([
-      generateJavascriptFiles({
-        srcDir: params.srcDir,
-        outDir: params.outDir,
-        babelConfig: params.babelConfig,
-      }),
+    generateJavascriptFiles({
+      srcDir: params.srcDir,
+      outDir: params.outDir,
+      babelConfig: params.babelConfig,
+    });
+    if (!params.skipDeclarations) {
       generateDeclarationsNatively({
         srcDir: params.srcDir,
         outDir: params.outDir,
         tsConfig: params.tsConfig,
-      }),
-    ]);
+      });
+    }
 
     spinner.success(
       params.witty
         ? '🦄 Generated Mostly Harmless JS files'
         : '🦄 Transformation completed!'
     );
-    // Step 2. -> Generate Type declaration files
   } catch (error) {
-    //If process has failed clean out the build directory
-    if (fs.existsSync(params.outDir)) {
-      fs.rmSync(params.outDir, { recursive: true, force: true });
-    }
-
     spinner.error(
       params.witty
         ? '🦄 What the photon did you just wrote ?'
         : '🐛 Transformation failed!'
     );
     Logger.Error(`Error building package:, ${error}`);
-    process.exit(1);
+    throw error;
   }
+}
+
+function removeDistArtifacts(params: {
+  srcPath: string;
+  srcDir: string;
+  outDir: string;
+}) {
+  const rel = path.relative(params.srcDir, params.srcPath);
+  if (isTsSource(params.srcPath)) {
+    const tsExt = params.srcPath.endsWith('.tsx') ? '.tsx' : '.ts';
+    const jsExt = tsExt === '.tsx' ? '.jsx' : '.js';
+    const baseOut = path
+      .join(params.outDir, rel)
+      .slice(0, -tsExt.length);
+    const candidates = [
+      `${baseOut}${jsExt}`,
+      `${baseOut}.d.ts`,
+      `${baseOut}.d.ts.map`,
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+  } else {
+    const outPath = path.join(params.outDir, rel);
+    if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+  }
+}
+
+function startIncrementalWatchers(params: {
+  srcDir: string;
+  outDir: string;
+  tsConfig?: string;
+  babelConfig?: string;
+}) {
+  const typesWatcher = startTypesWatcher({
+    srcDir: params.srcDir,
+    outDir: params.outDir,
+    tsConfig: params.tsConfig,
+  });
+
+  function onUpsert(srcPath: string) {
+    try {
+      if (isTsSource(srcPath)) {
+        transformFile({
+          srcPath,
+          outPath: computeOutPath(srcPath, params.srcDir, params.outDir),
+          babelConfig: params.babelConfig,
+        });
+      } else {
+        const outPath = path.join(
+          params.outDir,
+          path.relative(params.srcDir, srcPath)
+        );
+        fs.mkdirSync(path.dirname(outPath), { recursive: true });
+        fs.copyFileSync(srcPath, outPath);
+      }
+      Logger.Info(
+        `Transformed ${path.relative(params.srcDir, srcPath)}`
+      );
+    } catch (error) {
+      Logger.Error(
+        `Failed to process ${path.relative(params.srcDir, srcPath)}: ${error}`
+      );
+    }
+  }
+
+  function onUnlink(srcPath: string) {
+    try {
+      removeDistArtifacts({
+        srcPath,
+        srcDir: params.srcDir,
+        outDir: params.outDir,
+      });
+      Logger.Info(
+        `Removed dist artifacts for ${path.relative(params.srcDir, srcPath)}`
+      );
+    } catch (error) {
+      Logger.Error(
+        `Failed to clean up ${path.relative(params.srcDir, srcPath)}: ${error}`
+      );
+    }
+  }
+
+  chokidar
+    .watch(params.srcDir, { ignoreInitial: true })
+    .on('add', (srcPath) => {
+      onUpsert(srcPath);
+      if (isTsSource(srcPath)) typesWatcher.addFile(srcPath);
+    })
+    .on('change', (srcPath) => {
+      onUpsert(srcPath);
+      // TS watch program re-emits .d.ts on its own.
+    })
+    .on('unlink', (srcPath) => {
+      onUnlink(srcPath);
+      if (isTsSource(srcPath)) typesWatcher.removeFile(srcPath);
+    });
+
+  Logger.Info(`Watching ${params.srcDir} for changes...`);
 }
 
 const cli = defineCommand({
@@ -132,28 +230,37 @@ const cli = defineCommand({
       fs.mkdirSync(outDir, { recursive: true });
     }
 
-    startTransformation({
-      srcDir,
-      outDir,
-      babelConfig: args.babelConfig,
-      tsConfig: args.tsConfig,
-      witty: args.witty,
-    });
+    try {
+      await runInitialBuild({
+        srcDir,
+        outDir,
+        babelConfig: args.babelConfig,
+        tsConfig: args.tsConfig,
+        witty: args.witty,
+        // In watch mode, the TS watch program emits .d.ts on its own
+        // initial pass, so the eager full-program pass would be
+        // redundant double work.
+        skipDeclarations: args.watch,
+      });
+    } catch (error) {
+      if (args.watch) {
+        Logger.Warning(
+          'Initial build failed. Watch mode is active — fix the error and save to retry.'
+        );
+      } else {
+        if (fs.existsSync(outDir)) {
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+        process.exit(1);
+      }
+    }
 
     if (args.watch) {
-      const debouncedTransformation = debounce(() => {
-        startTransformation({
-          srcDir,
-          outDir,
-          babelConfig: args.babelConfig,
-          tsConfig: args.tsConfig,
-          witty: args.witty,
-        });
-      }, 500);
-
-      chokidar.watch(srcDir, { ignoreInitial: true }).on('all', () => {
-        Logger.Info('🔄 Detected changes, rebuilding...');
-        debouncedTransformation();
+      startIncrementalWatchers({
+        srcDir,
+        outDir,
+        babelConfig: args.babelConfig,
+        tsConfig: args.tsConfig,
       });
     }
   },

@@ -8,10 +8,30 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function isTsSource(filePath: string): boolean {
+  return filePath.endsWith('.ts') || filePath.endsWith('.tsx');
+}
+
 /**
- * Transform a single TypeScript file using Babel (in-memory)
- * @param srcPath - Source file path
- * @param outPath - Output file path
+ * Map a src file path to its corresponding dist path, swapping the
+ * TypeScript extension for the JSX/JS equivalent. Non-TS files are
+ * mirrored without extension changes.
+ */
+function computeOutPath(
+  srcPath: string,
+  srcDir: string,
+  outDir: string
+): string {
+  const rel = path.relative(srcDir, srcPath);
+  const out = path.join(outDir, rel);
+  if (out.endsWith('.tsx')) return `${out.slice(0, -4)}.jsx`;
+  if (out.endsWith('.ts')) return `${out.slice(0, -3)}.js`;
+  return out;
+}
+
+/**
+ * Transform a single TypeScript file using Babel (in-memory).
+ * Writes directly to the given final outPath (.jsx or .js).
  */
 function transformFile(params: {
   srcPath: string;
@@ -28,47 +48,51 @@ function transformFile(params: {
   });
 
   if (result?.code) {
-    fs.writeFileSync(
-      params.outPath.replace('.tsx', '.jsx').replace('.ts', '.js'),
-      result.code,
-      'utf8'
-    );
+    fs.mkdirSync(path.dirname(params.outPath), { recursive: true });
+    fs.writeFileSync(params.outPath, result.code, 'utf8');
   }
 }
 
+function walkFiles(srcDir: string): string[] {
+  const results: string[] = [];
+  const stack: string[] = [srcDir];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else results.push(full);
+    }
+  }
+  return results;
+}
+
 /**
- * Recursively process all `.ts` and `.tsx` files in a directory
- * @param srcDir - The directory containing TypeScript files
- * @param outDir - The output directory for transformed files
+ * Process all `.ts`/`.tsx` files in a directory (full tree) and copy
+ * non-TS assets through as-is. Used for the initial build.
  */
 function generateJavascriptFiles(params: {
   srcDir: string;
   outDir: string;
   babelConfig?: string;
 }) {
-  // ! Don't remove this, this will create the nested directory
   fs.mkdirSync(params.outDir, { recursive: true });
-  fs.readdirSync(params.srcDir, { withFileTypes: true }).forEach((entry) => {
-    const srcPath = path.join(params.srcDir, entry.name);
-    const outPath = path.join(params.outDir, entry.name);
-
-    if (entry.isDirectory()) {
-      generateJavascriptFiles({
-        srcDir: srcPath,
-        outDir: outPath,
-        babelConfig: params.babelConfig,
-      });
-    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+  for (const srcPath of walkFiles(params.srcDir)) {
+    if (isTsSource(srcPath)) {
       transformFile({
         srcPath,
-        outPath,
+        outPath: computeOutPath(srcPath, params.srcDir, params.outDir),
         babelConfig: params.babelConfig,
       });
     } else {
-      // Copy asset files as-is
+      const outPath = path.join(
+        params.outDir,
+        path.relative(params.srcDir, srcPath)
+      );
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.copyFileSync(srcPath, outPath);
     }
-  });
+  }
 }
 
-export { generateJavascriptFiles };
+export { generateJavascriptFiles, transformFile, computeOutPath, isTsSource };

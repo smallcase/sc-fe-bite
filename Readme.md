@@ -80,7 +80,14 @@ bite-tsx-transform  --src ./lib --dist ./build --witty
 
 ## Watch Mode
 
-When using `--watch`, the CLI will monitor the source directory for changes and automatically recompile files when modifications are detected. The file-watching is debounced to prevent excessive rebuilds.
+When using `--watch`, the CLI monitors the source directory and processes changes **incrementally — per file**:
+
+- On **edit** (`change`) of a `.ts`/`.tsx`, only that file is re-transpiled via Babel and written to `dist/`. A persistent `ts.createWatchProgram` instance re-emits the corresponding `.d.ts` (and `.d.ts.map`) for just the files it considers affected.
+- On **add** of a `.ts`/`.tsx`, the file is transpiled and TypeScript's watch program is updated with the new root file.
+- On **delete** (`unlink`) of a `.ts`/`.tsx`, the matching `.jsx`/`.js`, `.d.ts`, and `.d.ts.map` artifacts in `dist/` are removed.
+- Non-TS files (assets) are copied/removed in the same way.
+
+Type errors are logged but **do not crash the watcher or wipe `dist/`** — fix and save to continue. If the **initial** (non-watch) build fails, the CLI still cleans the output directory and exits non-zero, matching the previous behavior.
 
 ## Logging & Error Handling
 
