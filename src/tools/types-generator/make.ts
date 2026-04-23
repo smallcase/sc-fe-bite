@@ -85,14 +85,69 @@ export type TypesWatcher = {
   close: () => void;
 };
 
+/**
+ * Returns a `ts.System` that pretends every file under `outDir` does
+ * not exist. Without this, TypeScript can resolve package-internal
+ * self-imports (e.g. `import { Foo } from '@smallcase/components'`
+ * from inside the components package) back into the package's own
+ * `dist/*.d.ts`, add those files to the program as inputs, and then
+ * refuse to emit them with TS5055 ("would overwrite input file") —
+ * meaning `.d.ts` never updates even when sources change.
+ *
+ * Writes still pass through so emission itself is unaffected.
+ */
+function createOutDirAwareSystem(outDir: string): ts.System {
+  const normalizedOutDir = outDir.endsWith('/') ? outDir : `${outDir}/`;
+  // Resolve symlinks on both sides before comparing. Critical for
+  // self-importing packages where TS reaches the package's own dist
+  // via `node_modules/<name>` (a symlink back into the repo) — that
+  // path is not textually under outDir but resolves to the same real
+  // location.
+  const resolveReal = (p: string) =>
+    ts.sys.realpath ? ts.sys.realpath(p) : p;
+  const realOutDir = resolveReal(outDir);
+  const normalizedRealOutDir = realOutDir.endsWith('/')
+    ? realOutDir
+    : `${realOutDir}/`;
+  const isUnderOutDir = (p: string) => {
+    if (p === outDir || p.startsWith(normalizedOutDir)) return true;
+    const real = resolveReal(p);
+    return real === realOutDir || real.startsWith(normalizedRealOutDir);
+  };
+
+  return {
+    ...ts.sys,
+    fileExists: (p) => (isUnderOutDir(p) ? false : ts.sys.fileExists(p)),
+    readFile: (p, encoding) =>
+      isUnderOutDir(p) ? undefined : ts.sys.readFile(p, encoding),
+    directoryExists: (p) =>
+      isUnderOutDir(p)
+        ? false
+        : ts.sys.directoryExists
+          ? ts.sys.directoryExists(p)
+          : false,
+    readDirectory: (rootDir, extensions, excludes, includes, depth) =>
+      isUnderOutDir(rootDir)
+        ? []
+        : ts.sys.readDirectory(rootDir, extensions, excludes, includes, depth),
+    getDirectories: (p) =>
+      isUnderOutDir(p)
+        ? []
+        : ts.sys.getDirectories
+          ? ts.sys.getDirectories(p)
+          : [],
+  };
+}
+
 function startRawWatchProgram(
   rootFiles: string[],
-  compilerOptions: ts.CompilerOptions
+  compilerOptions: ts.CompilerOptions,
+  outDir: string
 ) {
   const host = ts.createWatchCompilerHost(
     rootFiles,
     compilerOptions,
-    ts.sys,
+    createOutDirAwareSystem(outDir),
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
     (diagnostic) => {
       Logger.Error(formatDiagnostic(diagnostic));
@@ -140,7 +195,7 @@ function startTypesWatcher(params: {
   let rootFiles = getAllTsFiles(params.srcDir);
   const compilerOptions = getCompilerOptions(params);
 
-  let watchProgram = startRawWatchProgram(rootFiles, compilerOptions);
+  let watchProgram = startRawWatchProgram(rootFiles, compilerOptions, params.outDir);
 
   let restartTimer: NodeJS.Timeout | null = null;
   function scheduleRestart() {
@@ -148,7 +203,7 @@ function startTypesWatcher(params: {
     restartTimer = setTimeout(() => {
       restartTimer = null;
       watchProgram.close();
-      watchProgram = startRawWatchProgram(rootFiles, compilerOptions);
+      watchProgram = startRawWatchProgram(rootFiles, compilerOptions, params.outDir);
     }, 200);
   }
 
