@@ -4,6 +4,7 @@ import ts from 'typescript';
 
 import { Logger } from '../../utils/logger.js';
 import { isExcludedSource } from '../../utils/exclude.js';
+import { getWorkspaceAmbientFiles } from '../../utils/workspace.js';
 
 function getAllTsFiles(srcDir: string): string[] {
   let results: string[] = [];
@@ -22,6 +23,28 @@ function getAllTsFiles(srcDir: string): string[] {
   });
 
   return results;
+}
+
+/**
+ * Combines the package's own root files (everything under srcDir) with
+ * any workspace-root ambient .d.ts files (e.g. a top-level `module.d.ts`
+ * declaring `*.module.css`, `*.svg`, etc.). Deduped by `realpath` so a
+ * symlink-into-src of the same root file doesn't enter the program twice.
+ */
+function getProgramRootFiles(srcDir: string): string[] {
+  const local = getAllTsFiles(srcDir);
+  const ambient = getWorkspaceAmbientFiles(srcDir);
+  if (ambient.length === 0) return local;
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const file of [...local, ...ambient]) {
+    const real = ts.sys.realpath ? ts.sys.realpath(file) : file;
+    if (seen.has(real)) continue;
+    seen.add(real);
+    result.push(file);
+  }
+  return result;
 }
 
 function getCompilerOptions(params: {
@@ -65,7 +88,7 @@ function generateDeclarationsNatively(params: {
   outDir: string;
   tsConfig?: string;
 }) {
-  const files = getAllTsFiles(params.srcDir);
+  const files = getProgramRootFiles(params.srcDir);
   const compilerOptions = getCompilerOptions(params);
 
   const program = ts.createProgram(files, compilerOptions);
@@ -196,7 +219,7 @@ function startTypesWatcher(params: {
   outDir: string;
   tsConfig?: string;
 }): TypesWatcher {
-  let rootFiles = getAllTsFiles(params.srcDir);
+  let rootFiles = getProgramRootFiles(params.srcDir);
   const compilerOptions = getCompilerOptions(params);
 
   let watchProgram = startRawWatchProgram(rootFiles, compilerOptions, params.outDir);

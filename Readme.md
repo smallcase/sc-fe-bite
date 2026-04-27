@@ -78,6 +78,12 @@ bite-tsx-transform --src ./lib --dist ./build --babelConfig ./babel.custom.json
 bite-tsx-transform  --src ./lib --dist ./build --witty
 ```
 
+## Workspace-root ambient declarations
+
+Bite walks up from the source directory looking for a workspace-root marker (`lerna.json`, `pnpm-workspace.yaml`, or a `package.json` with a `workspaces` field). If one is found, any `*.d.ts` files sitting at that root (e.g. `module.d.ts` declaring `*.module.css`, `*.svg`, `*.png`, etc.) are automatically included in every package's TypeScript program.
+
+This means a single root-level `module.d.ts` covers every package in the workspace — you don't need to symlink it into each `packages/*/src/`. Package-local `*.d.ts` files (under each package's `src/`) are still picked up as before; the two sets are merged in the program (TS treats `declare module` blocks additively). Files are deduped by `realpath`, so a symlink-into-`src/` of the same root file doesn't enter the program twice.
+
 ## Excluded source files
 
 Bite skips a few classes of source files entirely — they are neither transpiled to `dist/` nor included in the TypeScript program:
