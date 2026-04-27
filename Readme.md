@@ -78,6 +78,18 @@ bite-tsx-transform --src ./lib --dist ./build --babelConfig ./babel.custom.json
 bite-tsx-transform  --src ./lib --dist ./build --witty
 ```
 
+## Excluded source files
+
+Bite skips a few classes of source files entirely — they are neither transpiled to `dist/` nor included in the TypeScript program:
+
+- `*.stories.{ts,tsx,js,jsx,mjs,cjs}`
+- `*.test.{ts,tsx,js,jsx,mjs,cjs}`
+- `*.spec.{ts,tsx,js,jsx,mjs,cjs}`
+- anything inside a `__tests__/` directory
+- anything inside a `__snapshots__/` directory
+
+These are dev-only files that consumers of the published package should never import. Excluding them keeps `dist/` clean and prevents a recurring footgun: stories or tests that import the package's own public name (e.g. `import { Foo } from '@smallcase/components'` from inside the components package) drag the package's own `dist/*.d.ts` back into the TypeScript program through workspace symlinks, producing TS5055 emit failures or noisy diagnostics.
+
 ## Watch Mode
 
 When using `--watch`, the CLI monitors the source directory and processes changes **incrementally — per file**:

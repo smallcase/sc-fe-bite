@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+import { isExcludedSource } from '../../utils/exclude.js';
+
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +80,7 @@ function generateJavascriptFiles(params: {
 }) {
   fs.mkdirSync(params.outDir, { recursive: true });
   for (const srcPath of walkFiles(params.srcDir)) {
+    if (isExcludedSource(srcPath)) continue;
     if (isTsSource(srcPath)) {
       transformFile({
         srcPath,

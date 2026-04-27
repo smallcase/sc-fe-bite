@@ -10,6 +10,7 @@ import packageJson from '../../package.json' with { type: 'json' };
 import { defineCommand, runMain } from 'citty';
 
 import { Logger } from '../utils/logger.js';
+import { isExcludedSource } from '../utils/exclude.js';
 import {
   generateJavascriptFiles,
   transformFile,
@@ -155,14 +156,17 @@ function startIncrementalWatchers(params: {
   chokidar
     .watch(params.srcDir, { ignoreInitial: true })
     .on('add', (srcPath) => {
+      if (isExcludedSource(srcPath)) return;
       onUpsert(srcPath);
       if (isTsSource(srcPath)) typesWatcher.addFile(srcPath);
     })
     .on('change', (srcPath) => {
+      if (isExcludedSource(srcPath)) return;
       onUpsert(srcPath);
       // TS watch program re-emits .d.ts on its own.
     })
     .on('unlink', (srcPath) => {
+      if (isExcludedSource(srcPath)) return;
       onUnlink(srcPath);
       if (isTsSource(srcPath)) typesWatcher.removeFile(srcPath);
     });

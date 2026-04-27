@@ -3,6 +3,7 @@ import fs from 'fs';
 import ts from 'typescript';
 
 import { Logger } from '../../utils/logger.js';
+import { isExcludedSource } from '../../utils/exclude.js';
 
 function getAllTsFiles(srcDir: string): string[] {
   let results: string[] = [];
@@ -12,7 +13,10 @@ function getAllTsFiles(srcDir: string): string[] {
 
     if (entry.isDirectory()) {
       results = results.concat(getAllTsFiles(srcPath)); // Recursive call
-    } else if (srcPath.endsWith('.ts') || srcPath.endsWith('.tsx')) {
+    } else if (
+      (srcPath.endsWith('.ts') || srcPath.endsWith('.tsx')) &&
+      !isExcludedSource(srcPath)
+    ) {
       results.push(srcPath);
     }
   });
