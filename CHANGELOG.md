@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.1](https://github.com/smallcase/sc-fe-bite/compare/v3.1.0...v3.1.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* skip tooling env .d.ts in workspace ambient discovery ([5b44474](https://github.com/smallcase/sc-fe-bite/commit/5b44474d8d0e386a78de04225f8a763210e1c3ee))
+* skip tooling/framework env .d.ts files in workspace ambient discovery ([76a9a3d](https://github.com/smallcase/sc-fe-bite/commit/76a9a3d2013b04f0cf5a271a0a1446584eb42822))
+
 ## [3.1.0](https://github.com/smallcase/sc-fe-bite/compare/v3.0.3...v3.1.0) (2026-04-29)
 
 
