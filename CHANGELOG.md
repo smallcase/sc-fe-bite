@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.2](https://github.com/smallcase/sc-fe-bite/compare/v3.1.1...v3.1.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* use pnpm instead of npm in publish workflow ([06a3bd3](https://github.com/smallcase/sc-fe-bite/commit/06a3bd3a495a4d6fd93dd349526e1d0f1a44aba8))
+* use pnpm instead of npm in publish workflow ([ad06738](https://github.com/smallcase/sc-fe-bite/commit/ad0673832b0f1a33731293e733b0355bf50abf38))
+
 ## [3.1.1](https://github.com/smallcase/sc-fe-bite/compare/v3.1.0...v3.1.1) (2026-04-29)
 
 
