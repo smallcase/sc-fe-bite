@@ -134,3 +134,42 @@ edits are reported without overwriting the last valid output; resolve the
 collision and save to continue. File events are batched to handle renames.
 Handwritten ambient `declare module` blocks for a migrated module must also be
 removed manually; Bite checks output paths, not duplicate API declarations.
+
+### Mixed-source configuration
+
+Use a package-specific build config to extend your workspace settings:
+
+```json
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "allowJs": true, "checkJs": false },
+  "include": ["src/**/*"],
+  "exclude": ["src/fixtures/**/*"]
+}
+```
+
+```sh
+bite-tsx-transform --src ./src --dist ./dist --tsConfig ./tsconfig.build.json
+```
+
+Bite parses configs with TypeScript, including JSONC, `extends`, relative paths,
+`files`, `include` and `exclude`. Source discovery stays inside `--src` and always
+excludes tests, stories, dependencies, `.git` and `--dist`. Imports can still bring
+other files into the TypeScript program, as with `tsc`.
+
+With `allowJs`, JavaScript participates in type inference (and checking if
+`checkJs` is enabled), but only TS/TSX implementations generate declarations.
+Existing JS declarations are copied unchanged. Add a handwritten declaration or
+explicit public types if a generated API needs to reference an untyped JS module.
+
+Precedence is Bite defaults, then user compiler options, then required build
+settings: CLI `rootDir`/`outDir`, declaration-only emission, declaration maps and
+preserved JSX. Inherited `noEmit`, `outFile`, `declarationDir`, incremental and composite
+settings cannot redirect or suppress Bite's output. Other options, including
+`target`, `module`, resolution and strictness, are retained. Babel configuration
+still controls runtime transformation; TypeScript `paths` do not rewrite imports.
+
+Invalid configs and output directories that contain the source directory fail
+before cleanup. Restart watch mode after editing config files. Keep a separate
+`tsc --noEmit` check: normal builds retain their emit-diagnostics behavior, while
+watch mode reports semantic errors without exiting.
