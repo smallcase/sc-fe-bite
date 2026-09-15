@@ -2,6 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import ts from 'typescript';
 
+import { validateOutputs } from '../ts-transformer/make.js';
+
 import { Logger } from '../../utils/logger.js';
 import { isExcludedSource } from '../../utils/exclude.js';
 import { getWorkspaceAmbientFiles } from '../../utils/workspace.js';
@@ -130,8 +132,7 @@ function createOutDirAwareSystem(outDir: string): ts.System {
   // via `node_modules/<name>` (a symlink back into the repo) — that
   // path is not textually under outDir but resolves to the same real
   // location.
-  const resolveReal = (p: string) =>
-    ts.sys.realpath ? ts.sys.realpath(p) : p;
+  const resolveReal = (p: string) => (ts.sys.realpath ? ts.sys.realpath(p) : p);
   const realOutDir = resolveReal(outDir);
   const normalizedRealOutDir = realOutDir.endsWith('/')
     ? realOutDir
@@ -169,7 +170,8 @@ function createOutDirAwareSystem(outDir: string): ts.System {
 function startRawWatchProgram(
   rootFiles: string[],
   compilerOptions: ts.CompilerOptions,
-  outDir: string
+  outDir: string,
+  srcDir: string
 ) {
   const host = ts.createWatchCompilerHost(
     rootFiles,
@@ -185,6 +187,15 @@ function startRawWatchProgram(
       );
     }
   );
+  const afterProgramCreate = host.afterProgramCreate;
+  host.afterProgramCreate = (program) => {
+    try {
+      validateOutputs(srcDir, outDir);
+      afterProgramCreate?.(program);
+    } catch (error) {
+      Logger.Error(String(error));
+    }
+  };
   return ts.createWatchProgram(host);
 }
 
@@ -222,7 +233,12 @@ function startTypesWatcher(params: {
   let rootFiles = getProgramRootFiles(params.srcDir);
   const compilerOptions = getCompilerOptions(params);
 
-  let watchProgram = startRawWatchProgram(rootFiles, compilerOptions, params.outDir);
+  let watchProgram = startRawWatchProgram(
+    rootFiles,
+    compilerOptions,
+    params.outDir,
+    params.srcDir
+  );
 
   let restartTimer: NodeJS.Timeout | null = null;
   function scheduleRestart() {
@@ -230,7 +246,12 @@ function startTypesWatcher(params: {
     restartTimer = setTimeout(() => {
       restartTimer = null;
       watchProgram.close();
-      watchProgram = startRawWatchProgram(rootFiles, compilerOptions, params.outDir);
+      watchProgram = startRawWatchProgram(
+        rootFiles,
+        compilerOptions,
+        params.outDir,
+        params.srcDir
+      );
     }, 200);
   }
 
