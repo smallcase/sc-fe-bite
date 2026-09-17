@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.2.1](https://github.com/smallcase/sc-fe-bite/compare/v3.2.0...v3.2.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* repair release and publish authentication ([a71055e](https://github.com/smallcase/sc-fe-bite/commit/a71055e2badb7ff29ed397990fa217485d1023ee))
+* repair release and publish workflows ([49d3adb](https://github.com/smallcase/sc-fe-bite/commit/49d3adb345d4b9658d0b5d1cc353113fa948e74c))
+
+
+### Reverts
+
+* restore PAT for release please ([07a8eb3](https://github.com/smallcase/sc-fe-bite/commit/07a8eb32db1e5ddac247a46001b67e06fb8a20f5))
+* restore PAT for Release Please ([9fd504b](https://github.com/smallcase/sc-fe-bite/commit/9fd504b2c1a21bcf989a58d8e2e400a754c24ce7))
+
 ## [3.2.0](https://github.com/smallcase/sc-fe-bite/compare/v3.1.1...v3.2.0) (2026-09-17)
 
 
