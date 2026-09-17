@@ -11,6 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function isTsSource(filePath: string): boolean {
+  return !isDeclarationFile(filePath) && isTypeInput(filePath);
+}
+
+function isDeclarationFile(filePath: string): boolean {
+  return filePath.endsWith('.d.ts');
+}
+
+function isTypeInput(filePath: string): boolean {
   return filePath.endsWith('.ts') || filePath.endsWith('.tsx');
 }
 
@@ -26,6 +34,7 @@ function computeOutPath(
 ): string {
   const rel = path.relative(srcDir, srcPath);
   const out = path.join(outDir, rel);
+  if (isDeclarationFile(srcPath)) return out;
   if (out.endsWith('.tsx')) return `${out.slice(0, -4)}.jsx`;
   if (out.endsWith('.ts')) return `${out.slice(0, -3)}.js`;
   return out;
@@ -63,24 +72,50 @@ function walkFiles(srcDir: string): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) stack.push(full);
-      else results.push(full);
+      else if (!isExcludedSource(full)) results.push(full);
     }
   }
   return results;
 }
 
-/**
- * Process all `.ts`/`.tsx` files in a directory (full tree) and copy
- * non-TS assets through as-is. Used for the initial build.
- */
+/** All artifacts owned by a source file, including generated declarations. */
+function getOutputPaths(
+  srcPath: string,
+  srcDir: string,
+  outDir: string
+): string[] {
+  const output = computeOutPath(srcPath, srcDir, outDir);
+  if (!isTsSource(srcPath)) return [output];
+  const base = output.replace(/\.jsx?$/, '');
+  return [output, `${base}.d.ts`, `${base}.d.ts.map`];
+}
+
+function validateOutputs(srcDir: string, outDir: string): Set<string> {
+  const owners = new Map<string, string>();
+  for (const source of walkFiles(srcDir)) {
+    for (const output of getOutputPaths(source, srcDir, outDir)) {
+      const previous = owners.get(output);
+      if (previous) {
+        throw new Error(
+          `Output collision: ${previous} and ${source} both produce ${output}. ` +
+            'Remove the obsolete implementation or handwritten declaration.'
+        );
+      }
+      owners.set(output, source);
+    }
+  }
+  return new Set(owners.keys());
+}
+
+/** Transform implementations and copy JS, declarations and assets unchanged. */
 function generateJavascriptFiles(params: {
   srcDir: string;
   outDir: string;
   babelConfig?: string;
 }) {
+  validateOutputs(params.srcDir, params.outDir);
   fs.mkdirSync(params.outDir, { recursive: true });
   for (const srcPath of walkFiles(params.srcDir)) {
-    if (isExcludedSource(srcPath)) continue;
     if (isTsSource(srcPath)) {
       transformFile({
         srcPath,
@@ -88,14 +123,19 @@ function generateJavascriptFiles(params: {
         babelConfig: params.babelConfig,
       });
     } else {
-      const outPath = path.join(
-        params.outDir,
-        path.relative(params.srcDir, srcPath)
-      );
+      const outPath = computeOutPath(srcPath, params.srcDir, params.outDir);
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.copyFileSync(srcPath, outPath);
     }
   }
 }
 
-export { generateJavascriptFiles, transformFile, computeOutPath, isTsSource };
+export {
+  generateJavascriptFiles,
+  transformFile,
+  computeOutPath,
+  isTsSource,
+  isTypeInput,
+  getOutputPaths,
+  validateOutputs,
+};

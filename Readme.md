@@ -119,3 +119,18 @@ Type errors are logged but **do not crash the watcher or wipe `dist/`** — fix 
 MIT License.
 
 **NOTE** - The old command `tsx-transform` has been deprecated and will be removed in next major version
+
+## Incremental JavaScript-to-TypeScript migration
+
+A source tree can contain JavaScript, TypeScript and handwritten declarations:
+
+- `.js`/`.jsx`, `.d.ts` and assets are copied unchanged.
+- `.ts`/`.tsx` implementations produce `.js`/`.jsx` and generated `.d.ts` files.
+- Two sources cannot own the same output. For example, remove `foo.js` and
+  its handwritten `foo.d.ts` when replacing them with `foo.ts`.
+
+Watch mode copies declaration edits and removes deleted artifacts. Conflicting
+edits are reported without overwriting the last valid output; resolve the
+collision and save to continue. File events are batched to handle renames.
+Handwritten ambient `declare module` blocks for a migrated module must also be
+removed manually; Bite checks output paths, not duplicate API declarations.

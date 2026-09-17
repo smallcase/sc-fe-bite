@@ -16,6 +16,9 @@ import {
   transformFile,
   computeOutPath,
   isTsSource,
+  isTypeInput,
+  getOutputPaths,
+  validateOutputs,
 } from '../tools/ts-transformer/make.js';
 import {
   generateDeclarationsNatively,
@@ -72,32 +75,6 @@ async function runInitialBuild(params: {
   }
 }
 
-function removeDistArtifacts(params: {
-  srcPath: string;
-  srcDir: string;
-  outDir: string;
-}) {
-  const rel = path.relative(params.srcDir, params.srcPath);
-  if (isTsSource(params.srcPath)) {
-    const tsExt = params.srcPath.endsWith('.tsx') ? '.tsx' : '.ts';
-    const jsExt = tsExt === '.tsx' ? '.jsx' : '.js';
-    const baseOut = path
-      .join(params.outDir, rel)
-      .slice(0, -tsExt.length);
-    const candidates = [
-      `${baseOut}${jsExt}`,
-      `${baseOut}.d.ts`,
-      `${baseOut}.d.ts.map`,
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) fs.unlinkSync(p);
-    }
-  } else {
-    const outPath = path.join(params.outDir, rel);
-    if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
-  }
-}
-
 function startIncrementalWatchers(params: {
   srcDir: string;
   outDir: string;
@@ -126,9 +103,7 @@ function startIncrementalWatchers(params: {
         fs.mkdirSync(path.dirname(outPath), { recursive: true });
         fs.copyFileSync(srcPath, outPath);
       }
-      Logger.Info(
-        `Transformed ${path.relative(params.srcDir, srcPath)}`
-      );
+      Logger.Info(`Transformed ${path.relative(params.srcDir, srcPath)}`);
     } catch (error) {
       Logger.Error(
         `Failed to process ${path.relative(params.srcDir, srcPath)}: ${error}`
@@ -136,42 +111,47 @@ function startIncrementalWatchers(params: {
     }
   }
 
-  function onUnlink(srcPath: string) {
+  // Batch rename events so deleting foo.js cannot delete the new foo.ts output.
+  // Keep rejected events pending; the next edit can resolve a collision.
+  const pending = new Set<string>();
+  let timer: NodeJS.Timeout | undefined;
+  function flush() {
     try {
-      removeDistArtifacts({
-        srcPath,
-        srcDir: params.srcDir,
-        outDir: params.outDir,
-      });
-      Logger.Info(
-        `Removed dist artifacts for ${path.relative(params.srcDir, srcPath)}`
-      );
+      const ownedOutputs = validateOutputs(params.srcDir, params.outDir);
+      for (const srcPath of pending) {
+        if (fs.existsSync(srcPath)) {
+          onUpsert(srcPath);
+          if (isTypeInput(srcPath)) typesWatcher.addFile(srcPath);
+        } else {
+          for (const output of getOutputPaths(
+            srcPath,
+            params.srcDir,
+            params.outDir
+          )) {
+            if (!ownedOutputs.has(output)) fs.rmSync(output, { force: true });
+          }
+          if (isTypeInput(srcPath)) typesWatcher.removeFile(srcPath);
+        }
+      }
+      pending.clear();
     } catch (error) {
-      Logger.Error(
-        `Failed to clean up ${path.relative(params.srcDir, srcPath)}: ${error}`
-      );
+      Logger.Error(`Failed to update package: ${error}`);
     }
   }
 
   chokidar
     .watch(params.srcDir, { ignoreInitial: true })
-    .on('add', (srcPath) => {
-      if (isExcludedSource(srcPath)) return;
-      onUpsert(srcPath);
-      if (isTsSource(srcPath)) typesWatcher.addFile(srcPath);
-    })
-    .on('change', (srcPath) => {
-      if (isExcludedSource(srcPath)) return;
-      onUpsert(srcPath);
-      // TS watch program re-emits .d.ts on its own.
-    })
-    .on('unlink', (srcPath) => {
-      if (isExcludedSource(srcPath)) return;
-      onUnlink(srcPath);
-      if (isTsSource(srcPath)) typesWatcher.removeFile(srcPath);
+    .on('ready', () => Logger.Info(`Watching ${params.srcDir} for changes...`))
+    .on('all', (event, srcPath) => {
+      if (
+        !['add', 'change', 'unlink'].includes(event) ||
+        isExcludedSource(srcPath)
+      )
+        return;
+      pending.add(srcPath);
+      clearTimeout(timer);
+      timer = setTimeout(flush, 100);
     });
-
-  Logger.Info(`Watching ${params.srcDir} for changes...`);
 }
 
 const cli = defineCommand({
@@ -219,7 +199,7 @@ const cli = defineCommand({
   },
   async run({ args }) {
     const srcDir = path.resolve(args.src);
-    const outDir = args.dist ?? path.resolve(srcDir, '../dist');
+    const outDir = path.resolve(args.dist ?? path.resolve(srcDir, '../dist'));
 
     if (!fs.existsSync(srcDir)) {
       Logger.Error(`Error: Source directory "${srcDir}" does not exist.`);
