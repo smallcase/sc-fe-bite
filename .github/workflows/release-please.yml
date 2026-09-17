@@ -13,15 +13,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Generate release app token
-        id: release-app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.CASE_CI_RELEASE_APP_ID }}
-          private-key: ${{ secrets.CASE_CI_RELEASE_APP_PRI_KEY }}
-
       - name: Create Release PR
         uses: googleapis/release-please-action@v4
         with:
           release-type: node
-          token: ${{ steps.release-app-token.outputs.token }}
+          token: ${{ secrets.PAT }}
