@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.2.0](https://github.com/smallcase/sc-fe-bite/compare/v3.1.1...v3.2.0) (2026-09-17)
+
+
+### Features
+
+* **config:** support mixed-source TypeScript build configs ([5ded7af](https://github.com/smallcase/sc-fe-bite/commit/5ded7af594d021dd4011dbe15a264479e425417d))
+* **config:** support mixed-source TypeScript build configs ([54a5012](https://github.com/smallcase/sc-fe-bite/commit/54a5012749b1db6940654ad17dd71ea51754e985))
+
+
+### Bug Fixes
+
+* **build:** preserve handwritten declarations during TS migration ([11b200c](https://github.com/smallcase/sc-fe-bite/commit/11b200cf358728548c546bbc162415dfe432896b))
+* **build:** preserve handwritten declarations during TS migration ([2e0a1f1](https://github.com/smallcase/sc-fe-bite/commit/2e0a1f1a7754f0edeae35af7299a290b9fc606d1))
+* use pnpm instead of npm in publish workflow ([06a3bd3](https://github.com/smallcase/sc-fe-bite/commit/06a3bd3a495a4d6fd93dd349526e1d0f1a44aba8))
+* use pnpm instead of npm in publish workflow ([ad06738](https://github.com/smallcase/sc-fe-bite/commit/ad0673832b0f1a33731293e733b0355bf50abf38))
+
 ## [3.1.1](https://github.com/smallcase/sc-fe-bite/compare/v3.1.0...v3.1.1) (2026-04-29)
 
 
