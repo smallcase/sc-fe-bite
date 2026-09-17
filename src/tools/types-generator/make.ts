@@ -5,27 +5,12 @@ import ts from 'typescript';
 import { validateOutputs } from '../ts-transformer/make.js';
 
 import { Logger } from '../../utils/logger.js';
-import { isExcludedSource } from '../../utils/exclude.js';
+import {
+  readBuildConfig,
+  isWithin,
+  type BuildParams,
+} from '../../utils/build-config.js';
 import { getWorkspaceAmbientFiles } from '../../utils/workspace.js';
-
-function getAllTsFiles(srcDir: string): string[] {
-  let results: string[] = [];
-
-  fs.readdirSync(srcDir, { withFileTypes: true }).forEach((entry) => {
-    const srcPath = path.join(srcDir, entry.name);
-
-    if (entry.isDirectory()) {
-      results = results.concat(getAllTsFiles(srcPath)); // Recursive call
-    } else if (
-      (srcPath.endsWith('.ts') || srcPath.endsWith('.tsx')) &&
-      !isExcludedSource(srcPath)
-    ) {
-      results.push(srcPath);
-    }
-  });
-
-  return results;
-}
 
 /**
  * Combines the package's own root files (everything under srcDir) with
@@ -33,9 +18,12 @@ function getAllTsFiles(srcDir: string): string[] {
  * declaring `*.module.css`, `*.svg`, etc.). Deduped by `realpath` so a
  * symlink-into-src of the same root file doesn't enter the program twice.
  */
-function getProgramRootFiles(srcDir: string): string[] {
-  const local = getAllTsFiles(srcDir);
-  const ambient = getWorkspaceAmbientFiles(srcDir);
+function getProgramRootFiles(params: BuildParams): string[] {
+  const { options, sourceFiles } = readBuildConfig(params);
+  const local = sourceFiles.filter(
+    (file) => /\.tsx?$/.test(file) || (options.allowJs && /\.jsx?$/.test(file))
+  );
+  const ambient = getWorkspaceAmbientFiles(params.srcDir);
   if (ambient.length === 0) return local;
 
   const seen = new Set<string>();
@@ -49,35 +37,26 @@ function getProgramRootFiles(srcDir: string): string[] {
   return result;
 }
 
-function getCompilerOptions(params: {
-  srcDir: string;
-  outDir: string;
-  tsConfig?: string;
-}): ts.CompilerOptions {
-  let compilerOptions: ts.CompilerOptions = {
-    outDir: params.outDir,
-    strict: true,
-    esModuleInterop: true,
-    declaration: true,
-    declarationMap: true,
-    emitDeclarationOnly: true,
-    skipLibCheck: true,
-    rootDir: params.srcDir,
-    jsx: ts.JsxEmit.Preserve,
-    target: ts.ScriptTarget.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-  };
-
-  if (params.tsConfig && fs.existsSync(params.tsConfig)) {
-    compilerOptions = JSON.parse(
-      fs.readFileSync(params.tsConfig, 'utf8')
-    ).compilerOptions;
-  }
-
-  return {
-    ...compilerOptions,
-    jsx: ts.JsxEmit.Preserve,
-    target: ts.ScriptTarget.ESNext,
+// JS participates in inference when allowJs is enabled, but legacy public
+// contracts remain handwritten. Never emit declarations for imported JS or
+// files outside this package (which TypeScript can discover through imports).
+function declarationWriter(
+  params: BuildParams,
+  writeFile: ts.WriteFileCallback
+): ts.WriteFileCallback {
+  return (fileName, data, bom, onError, sourceFiles) => {
+    if (!isWithin(path.resolve(params.outDir), path.resolve(fileName))) return;
+    if (
+      !sourceFiles?.length ||
+      sourceFiles.some(
+        (source) =>
+          source.fileName.endsWith('.d.ts') ||
+          !/\.tsx?$/.test(source.fileName) ||
+          !isWithin(path.resolve(params.srcDir), path.resolve(source.fileName))
+      )
+    )
+      return;
+    writeFile(fileName, data, bom, onError, sourceFiles);
   };
 }
 
@@ -90,11 +69,15 @@ function generateDeclarationsNatively(params: {
   outDir: string;
   tsConfig?: string;
 }) {
-  const files = getProgramRootFiles(params.srcDir);
-  const compilerOptions = getCompilerOptions(params);
+  const files = getProgramRootFiles(params);
+  const compilerOptions = readBuildConfig(params).options;
 
-  const program = ts.createProgram(files, compilerOptions);
-
+  const host = ts.createIncrementalCompilerHost(
+    compilerOptions,
+    createOutDirAwareSystem(params.outDir)
+  );
+  host.writeFile = declarationWriter(params, host.writeFile);
+  const program = ts.createProgram(files, compilerOptions, host);
   const result = program.emit();
 
   if (result.diagnostics.length !== 0) {
@@ -171,7 +154,7 @@ function startRawWatchProgram(
   rootFiles: string[],
   compilerOptions: ts.CompilerOptions,
   outDir: string,
-  srcDir: string
+  params: BuildParams
 ) {
   const host = ts.createWatchCompilerHost(
     rootFiles,
@@ -187,10 +170,22 @@ function startRawWatchProgram(
       );
     }
   );
+  const createProgram = host.createProgram;
+  const writers = new WeakMap<ts.CompilerHost, ts.WriteFileCallback>();
+  host.createProgram = (rootNames, options, compilerHost, ...rest) => {
+    if (compilerHost && writers.get(compilerHost) !== compilerHost.writeFile) {
+      compilerHost.writeFile = declarationWriter(
+        params,
+        compilerHost.writeFile
+      );
+      writers.set(compilerHost, compilerHost.writeFile);
+    }
+    return createProgram(rootNames, options, compilerHost, ...rest);
+  };
   const afterProgramCreate = host.afterProgramCreate;
   host.afterProgramCreate = (program) => {
     try {
-      validateOutputs(srcDir, outDir);
+      validateOutputs(params.srcDir, outDir, params.tsConfig);
       afterProgramCreate?.(program);
     } catch (error) {
       Logger.Error(String(error));
@@ -230,14 +225,14 @@ function startTypesWatcher(params: {
   outDir: string;
   tsConfig?: string;
 }): TypesWatcher {
-  let rootFiles = getProgramRootFiles(params.srcDir);
-  const compilerOptions = getCompilerOptions(params);
+  let rootFiles = getProgramRootFiles(params);
+  const compilerOptions = readBuildConfig(params).options;
 
   let watchProgram = startRawWatchProgram(
     rootFiles,
     compilerOptions,
     params.outDir,
-    params.srcDir
+    params
   );
 
   let restartTimer: NodeJS.Timeout | null = null;
@@ -246,17 +241,19 @@ function startTypesWatcher(params: {
     restartTimer = setTimeout(() => {
       restartTimer = null;
       watchProgram.close();
+      rootFiles = getProgramRootFiles(params);
       watchProgram = startRawWatchProgram(
         rootFiles,
         compilerOptions,
         params.outDir,
-        params.srcDir
+        params
       );
     }, 200);
   }
 
   return {
     addFile(srcPath: string) {
+      if (!/\.tsx?$/.test(srcPath) && !compilerOptions.allowJs) return;
       if (!rootFiles.includes(srcPath)) {
         rootFiles.push(srcPath);
         scheduleRestart();

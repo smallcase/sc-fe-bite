@@ -12,6 +12,11 @@ import { defineCommand, runMain } from 'citty';
 import { Logger } from '../utils/logger.js';
 import { isExcludedSource } from '../utils/exclude.js';
 import {
+  readBuildConfig,
+  isWithin,
+  resolveBuildPath,
+} from '../utils/build-config.js';
+import {
   generateJavascriptFiles,
   transformFile,
   computeOutPath,
@@ -50,6 +55,7 @@ async function runInitialBuild(params: {
       srcDir: params.srcDir,
       outDir: params.outDir,
       babelConfig: params.babelConfig,
+      tsConfig: params.tsConfig,
     });
     if (!params.skipDeclarations) {
       generateDeclarationsNatively({
@@ -117,11 +123,18 @@ function startIncrementalWatchers(params: {
   let timer: NodeJS.Timeout | undefined;
   function flush() {
     try {
-      const ownedOutputs = validateOutputs(params.srcDir, params.outDir);
+      const ownedOutputs = validateOutputs(
+        params.srcDir,
+        params.outDir,
+        params.tsConfig
+      );
+      const selected = new Set(readBuildConfig(params).sourceFiles);
       for (const srcPath of pending) {
+        if (fs.existsSync(srcPath) && !selected.has(srcPath)) continue;
         if (fs.existsSync(srcPath)) {
           onUpsert(srcPath);
-          if (isTypeInput(srcPath)) typesWatcher.addFile(srcPath);
+          if (isTypeInput(srcPath) || /\.jsx?$/.test(srcPath))
+            typesWatcher.addFile(srcPath);
         } else {
           for (const output of getOutputPaths(
             srcPath,
@@ -130,7 +143,8 @@ function startIncrementalWatchers(params: {
           )) {
             if (!ownedOutputs.has(output)) fs.rmSync(output, { force: true });
           }
-          if (isTypeInput(srcPath)) typesWatcher.removeFile(srcPath);
+          if (isTypeInput(srcPath) || /\.jsx?$/.test(srcPath))
+            typesWatcher.removeFile(srcPath);
         }
       }
       pending.clear();
@@ -140,7 +154,14 @@ function startIncrementalWatchers(params: {
   }
 
   chokidar
-    .watch(params.srcDir, { ignoreInitial: true })
+    .watch(params.srcDir, {
+      ignoreInitial: true,
+      ignored: (file) =>
+        isWithin(params.outDir, file) ||
+        file
+          .split(path.sep)
+          .some((part) => part === 'node_modules' || part === '.git'),
+    })
     .on('ready', () => Logger.Info(`Watching ${params.srcDir} for changes...`))
     .on('all', (event, srcPath) => {
       if (
@@ -198,13 +219,18 @@ const cli = defineCommand({
     },
   },
   async run({ args }) {
-    const srcDir = path.resolve(args.src);
-    const outDir = path.resolve(args.dist ?? path.resolve(srcDir, '../dist'));
+    const srcDir = resolveBuildPath(args.src);
+    const outDir = resolveBuildPath(
+      args.dist ?? path.resolve(srcDir, '../dist')
+    );
 
     if (!fs.existsSync(srcDir)) {
       Logger.Error(`Error: Source directory "${srcDir}" does not exist.`);
       process.exit(1);
     }
+
+    // Validate configuration and directory boundaries before any cleanup.
+    readBuildConfig({ srcDir, outDir, tsConfig: args.tsConfig });
 
     if (args.clean) {
       fs.rmSync(outDir, { recursive: true, force: true });

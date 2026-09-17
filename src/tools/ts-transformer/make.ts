@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-import { isExcludedSource } from '../../utils/exclude.js';
+import { readBuildConfig } from '../../utils/build-config.js';
 
 // Manually define __dirname for ESM: FUCK YOU NODE
 const __filename = fileURLToPath(import.meta.url);
@@ -64,20 +64,6 @@ function transformFile(params: {
   }
 }
 
-function walkFiles(srcDir: string): string[] {
-  const results: string[] = [];
-  const stack: string[] = [srcDir];
-  while (stack.length > 0) {
-    const dir = stack.pop() as string;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) stack.push(full);
-      else if (!isExcludedSource(full)) results.push(full);
-    }
-  }
-  return results;
-}
-
 /** All artifacts owned by a source file, including generated declarations. */
 function getOutputPaths(
   srcPath: string,
@@ -90,9 +76,14 @@ function getOutputPaths(
   return [output, `${base}.d.ts`, `${base}.d.ts.map`];
 }
 
-function validateOutputs(srcDir: string, outDir: string): Set<string> {
+function validateOutputs(
+  srcDir: string,
+  outDir: string,
+  tsConfig?: string
+): Set<string> {
   const owners = new Map<string, string>();
-  for (const source of walkFiles(srcDir)) {
+  for (const source of readBuildConfig({ srcDir, outDir, tsConfig })
+    .sourceFiles) {
     for (const output of getOutputPaths(source, srcDir, outDir)) {
       const previous = owners.get(output);
       if (previous) {
@@ -112,10 +103,11 @@ function generateJavascriptFiles(params: {
   srcDir: string;
   outDir: string;
   babelConfig?: string;
+  tsConfig?: string;
 }) {
-  validateOutputs(params.srcDir, params.outDir);
+  validateOutputs(params.srcDir, params.outDir, params.tsConfig);
   fs.mkdirSync(params.outDir, { recursive: true });
-  for (const srcPath of walkFiles(params.srcDir)) {
+  for (const srcPath of readBuildConfig(params).sourceFiles) {
     if (isTsSource(srcPath)) {
       transformFile({
         srcPath,
