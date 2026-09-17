@@ -22,6 +22,13 @@ jobs:
       # pnpm is not pre-installed on ubuntu-latest runners; Volta manages node only.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      # pnpm 11 ignores credentials from a project-level .npmrc. Store the
+      # GitHub Packages token in the trusted user config before publishing.
+      - name: Configure GitHub Packages authentication
+        run: pnpm config set '//npm.pkg.github.com/:_authToken' "$GH_NPM_TOKEN"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
