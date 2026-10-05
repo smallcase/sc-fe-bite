@@ -166,28 +166,32 @@ function startIncrementalWatchers(params: {
     }
   }
 
-  chokidar
-    .watch(params.srcDir, {
-      ignoreInitial: true,
-      ignored: (file) =>
-        isWithin(params.outDir, file) ||
-        file
-          .split(path.sep)
-          .some((part) => part === 'node_modules' || part === '.git'),
-    })
-    .on('ready', () =>
-      Logger.Info(`${tag}Watching ${params.srcDir} for changes...`)
-    )
-    .on('all', (event, srcPath) => {
-      if (
-        !['add', 'change', 'unlink'].includes(event) ||
-        isExcludedSource(srcPath)
-      )
-        return;
-      pending.add(srcPath);
-      clearTimeout(timer);
-      timer = setTimeout(flush, 100);
-    });
+  // Resolve once the initial scan finishes; earlier edits would be missed.
+  return new Promise<void>((resolve) =>
+    chokidar
+      .watch(params.srcDir, {
+        ignoreInitial: true,
+        ignored: (file) =>
+          isWithin(params.outDir, file) ||
+          file
+            .split(path.sep)
+            .some((part) => part === 'node_modules' || part === '.git'),
+      })
+      .on('ready', () => {
+        Logger.Info(`${tag}Watching ${params.srcDir} for changes...`);
+        resolve();
+      })
+      .on('all', (event, srcPath) => {
+        if (
+          !['add', 'change', 'unlink'].includes(event) ||
+          isExcludedSource(srcPath)
+        )
+          return;
+        pending.add(srcPath);
+        clearTimeout(timer);
+        timer = setTimeout(flush, 100);
+      })
+  );
 }
 
 const args = {
@@ -306,7 +310,13 @@ async function runPackage(
   }
 
   if (options.watch) {
-    startIncrementalWatchers({ srcDir, outDir, babelConfig, tsConfig, label });
+    await startIncrementalWatchers({
+      srcDir,
+      outDir,
+      babelConfig,
+      tsConfig,
+      label,
+    });
   }
 }
 
