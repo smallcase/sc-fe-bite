@@ -156,17 +156,18 @@ function startRawWatchProgram(
   outDir: string,
   params: BuildParams
 ) {
+  const tag = params.label ? `[${params.label}] ` : '';
   const host = ts.createWatchCompilerHost(
     rootFiles,
     compilerOptions,
     createOutDirAwareSystem(outDir),
     ts.createEmitAndSemanticDiagnosticsBuilderProgram,
     (diagnostic) => {
-      Logger.Error(formatDiagnostic(diagnostic));
+      Logger.Error(tag + formatDiagnostic(diagnostic));
     },
     (diagnostic) => {
       Logger.Info(
-        ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+        tag + ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
       );
     }
   );
@@ -188,7 +189,7 @@ function startRawWatchProgram(
       validateOutputs(params.srcDir, outDir, params.tsConfig);
       afterProgramCreate?.(program);
     } catch (error) {
-      Logger.Error(String(error));
+      Logger.Error(tag + String(error));
     }
   };
   return ts.createWatchProgram(host);
@@ -220,11 +221,7 @@ function formatDiagnostic(diagnostic: ts.Diagnostic): string {
  * for newly-added files. `change` events don't need a call — TS's own
  * file watcher sees them.
  */
-function startTypesWatcher(params: {
-  srcDir: string;
-  outDir: string;
-  tsConfig?: string;
-}): TypesWatcher {
+function startTypesWatcher(params: BuildParams): TypesWatcher {
   let rootFiles = getProgramRootFiles(params);
   const compilerOptions = readBuildConfig(params).options;
 

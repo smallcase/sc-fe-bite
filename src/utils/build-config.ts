@@ -4,7 +4,13 @@ import ts from 'typescript';
 
 import { isExcludedSource } from './exclude.js';
 
-export type BuildParams = { srcDir: string; outDir: string; tsConfig?: string };
+export type BuildParams = {
+  srcDir: string;
+  outDir: string;
+  tsConfig?: string;
+  // Prefixes log lines when one process watches several packages.
+  label?: string;
+};
 
 // Resolve existing ancestors too, so a not-yet-created dist through a symlink
 // is compared against the same physical source directory before --clean.

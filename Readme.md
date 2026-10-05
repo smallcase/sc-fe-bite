@@ -34,6 +34,7 @@ bite-tsx-transform --src ./lib --dist ./dist
 | `--src`         |       | string  | Path to the source directory (default: `src/`)  | ❌ No    |
 | `--dist`        |       | string  | Path to the output directory (default: `dist/`) | ❌ No    |
 | `--watch`       | `-w`  | boolean | Enables watch mode                              | ❌ No    |
+| `--workspace`   |       | boolean | With `--watch`, watches all workspace packages in one process | ❌ No    |
 | `--clean`       |       | boolean | Cleans the output directory before transpiling  | ❌ No    |
 | `--tsConfig`    |       | string  | Path to custom `tsconfig.json`                  | ❌ No    |
 | `--babelConfig` |       | string  | Path to custom `babel.config.json`              | ❌ No    |
@@ -100,12 +101,24 @@ These are dev-only files that consumers of the published package should never im
 
 When using `--watch`, the CLI monitors the source directory and processes changes **incrementally — per file**:
 
-- On **startup**, only sources newer than their output (or without one) are re-transpiled. The TypeScript watch program, which loads every imported and `@types` file, starts only once the package's declarations are stale or a file changes. In a monorepo-wide `build:watch`, untouched packages stay idle. Run a normal build after changing Babel or TypeScript config, since outputs that look up to date are not rebuilt.
+- On **startup**, only sources newer than their output (or without one) are re-transpiled, and stale declarations are regenerated once. The TypeScript watch program, which loads every imported and `@types` file, starts on the package's first edit, so untouched packages stay idle. Run a normal build after changing Babel or TypeScript config, since outputs that look up to date are not rebuilt.
 
 - On **edit** (`change`) of a `.ts`/`.tsx`, only that file is re-transpiled via Babel and written to `dist/`. A persistent `ts.createWatchProgram` instance re-emits the corresponding `.d.ts` (and `.d.ts.map`) for just the files it considers affected.
 - On **add** of a `.ts`/`.tsx`, the file is transpiled and TypeScript's watch program is updated with the new root file.
 - On **delete** (`unlink`) of a `.ts`/`.tsx`, the matching `.jsx`/`.js`, `.d.ts`, and `.d.ts.map` artifacts in `dist/` are removed.
 - Non-TS files (assets) are copied/removed in the same way.
+
+### Watching a monorepo
+
+Run `bite-tsx-transform --watch --workspace` at the workspace root instead of one watcher per package (e.g. `lerna run build:watch --parallel`):
+
+```json
+{ "scripts": { "build:watch": "bite-tsx-transform --watch --workspace" } }
+```
+
+Packages come from `workspaces` in `package.json` (or `packages` in `lerna.json`; `dir/*` and plain directory patterns). Every package whose `build:watch` script runs `tsx-transform`/`bite-tsx-transform` is watched with that script's arguments, and log lines are prefixed with the package directory. A package that fails to start is logged and skipped.
+
+One process shares a single inotify instance, file-watcher set and copy of TypeScript and Babel. A watcher process per package can exhaust `fs.inotify.max_user_instances` on Linux (`EMFILE: too many open files`) and idles at roughly 125 MB per package.
 
 Type errors are logged but **do not crash the watcher or wipe `dist/`** — fix and save to continue. If the **initial** (non-watch) build fails, the CLI still cleans the output directory and exits non-zero, matching the previous behavior.
 
