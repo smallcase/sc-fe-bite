@@ -98,24 +98,44 @@ function validateOutputs(
   return new Set(owners.keys());
 }
 
+/** True when outPath is missing or older than srcPath. */
+function isStale(srcPath: string, outPath: string): boolean {
+  return (
+    !fs.existsSync(outPath) ||
+    fs.statSync(outPath).mtimeMs < fs.statSync(srcPath).mtimeMs
+  );
+}
+
+/** True when any TS implementation has a missing or outdated declaration. */
+function hasStaleDeclarations(params: {
+  srcDir: string;
+  outDir: string;
+  tsConfig?: string;
+}): boolean {
+  return readBuildConfig(params).sourceFiles.some(
+    (srcPath) =>
+      isTsSource(srcPath) &&
+      isStale(srcPath, getOutputPaths(srcPath, params.srcDir, params.outDir)[1])
+  );
+}
+
 /** Transform implementations and copy JS, declarations and assets unchanged. */
 function generateJavascriptFiles(params: {
   srcDir: string;
   outDir: string;
   babelConfig?: string;
   tsConfig?: string;
+  // Skip sources whose output is newer than the source (watch startup).
+  onlyStale?: boolean;
 }) {
   validateOutputs(params.srcDir, params.outDir, params.tsConfig);
   fs.mkdirSync(params.outDir, { recursive: true });
   for (const srcPath of readBuildConfig(params).sourceFiles) {
+    const outPath = computeOutPath(srcPath, params.srcDir, params.outDir);
+    if (params.onlyStale && !isStale(srcPath, outPath)) continue;
     if (isTsSource(srcPath)) {
-      transformFile({
-        srcPath,
-        outPath: computeOutPath(srcPath, params.srcDir, params.outDir),
-        babelConfig: params.babelConfig,
-      });
+      transformFile({ srcPath, outPath, babelConfig: params.babelConfig });
     } else {
-      const outPath = computeOutPath(srcPath, params.srcDir, params.outDir);
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.copyFileSync(srcPath, outPath);
     }
@@ -130,4 +150,5 @@ export {
   isTypeInput,
   getOutputPaths,
   validateOutputs,
+  hasStaleDeclarations,
 };

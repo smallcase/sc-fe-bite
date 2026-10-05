@@ -100,6 +100,8 @@ These are dev-only files that consumers of the published package should never im
 
 When using `--watch`, the CLI monitors the source directory and processes changes **incrementally — per file**:
 
+- On **startup**, only sources newer than their output (or without one) are re-transpiled. The TypeScript watch program, which loads every imported and `@types` file, starts only once the package's declarations are stale or a file changes. In a monorepo-wide `build:watch`, untouched packages stay idle. Run a normal build after changing Babel or TypeScript config, since outputs that look up to date are not rebuilt.
+
 - On **edit** (`change`) of a `.ts`/`.tsx`, only that file is re-transpiled via Babel and written to `dist/`. A persistent `ts.createWatchProgram` instance re-emits the corresponding `.d.ts` (and `.d.ts.map`) for just the files it considers affected.
 - On **add** of a `.ts`/`.tsx`, the file is transpiled and TypeScript's watch program is updated with the new root file.
 - On **delete** (`unlink`) of a `.ts`/`.tsx`, the matching `.jsx`/`.js`, `.d.ts`, and `.d.ts.map` artifacts in `dist/` are removed.

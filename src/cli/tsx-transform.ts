@@ -24,10 +24,12 @@ import {
   isTypeInput,
   getOutputPaths,
   validateOutputs,
+  hasStaleDeclarations,
 } from '../tools/ts-transformer/make.js';
 import {
   generateDeclarationsNatively,
   startTypesWatcher,
+  type TypesWatcher,
 } from '../tools/types-generator/make.js';
 import yoctoSpinner from 'yocto-spinner';
 import chalk from 'chalk';
@@ -42,6 +44,7 @@ async function runInitialBuild(params: {
   // program's own initial emit covers it (and then handles
   // incremental updates for each edit).
   skipDeclarations?: boolean;
+  onlyStale?: boolean;
 }) {
   const spinner = yoctoSpinner({
     spinner: { interval: 60, frames: ['🌕 ', '🌗 ', '🌑 '] },
@@ -56,6 +59,7 @@ async function runInitialBuild(params: {
       outDir: params.outDir,
       babelConfig: params.babelConfig,
       tsConfig: params.tsConfig,
+      onlyStale: params.onlyStale,
     });
     if (!params.skipDeclarations) {
       generateDeclarationsNatively({
@@ -87,11 +91,12 @@ function startIncrementalWatchers(params: {
   tsConfig?: string;
   babelConfig?: string;
 }) {
-  const typesWatcher = startTypesWatcher({
-    srcDir: params.srcDir,
-    outDir: params.outDir,
-    tsConfig: params.tsConfig,
-  });
+  // A TS watch program loads the package plus every imported/@types file and
+  // watches all of them. Start it only once this package needs declarations,
+  // so idle packages in a monorepo-wide watch cost just a chokidar watcher.
+  let typesWatcher: TypesWatcher | undefined;
+  const types = () => (typesWatcher ??= startTypesWatcher(params));
+  if (hasStaleDeclarations(params)) types();
 
   function onUpsert(srcPath: string) {
     try {
@@ -134,7 +139,7 @@ function startIncrementalWatchers(params: {
         if (fs.existsSync(srcPath)) {
           onUpsert(srcPath);
           if (isTypeInput(srcPath) || /\.jsx?$/.test(srcPath))
-            typesWatcher.addFile(srcPath);
+            types().addFile(srcPath);
         } else {
           for (const output of getOutputPaths(
             srcPath,
@@ -144,7 +149,7 @@ function startIncrementalWatchers(params: {
             if (!ownedOutputs.has(output)) fs.rmSync(output, { force: true });
           }
           if (isTypeInput(srcPath) || /\.jsx?$/.test(srcPath))
-            typesWatcher.removeFile(srcPath);
+            types().removeFile(srcPath);
         }
       }
       pending.clear();
@@ -251,6 +256,8 @@ const cli = defineCommand({
         // initial pass, so the eager full-program pass would be
         // redundant double work.
         skipDeclarations: args.watch,
+        // Outputs newer than their sources are left alone on watch startup.
+        onlyStale: args.watch,
       });
     } catch (error) {
       if (args.watch) {

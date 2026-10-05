@@ -117,3 +117,28 @@ test('watch copies declaration changes and survives JS-to-TS migration', async (
   );
   assert.equal(watch.child.exitCode, null);
 });
+
+test('watch skips up-to-date outputs and starts declarations lazily', async (t) => {
+  const f = await fixture(t);
+  await f.write('a.ts', 'export const a = 1;');
+  await f.write('b.ts', 'export const b = 1;');
+  const build = f.run();
+  assert.equal((await build.closed)[0], 0, build.output());
+  const untouched = (await fs.stat(path.join(f.dir, 'dist/b.js'))).mtimeMs;
+  const watch = f.run('--watch');
+  await until(
+    async () =>
+      watch.output().includes(`Watching ${path.join(f.dir, 'src')} for changes`),
+    'watch ready'
+  );
+  assert.doesNotMatch(watch.output(), /Starting compilation/);
+  await f.write('a.ts', 'export const a = "x";');
+  await until(
+    async () => (await f.read('a.d.ts')).includes('"x"'),
+    'lazy declaration update'
+  );
+  assert.equal(
+    (await fs.stat(path.join(f.dir, 'dist/b.js'))).mtimeMs,
+    untouched
+  );
+});
