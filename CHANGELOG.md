@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.0](https://github.com/smallcase/sc-fe-bite/compare/v3.2.1...v3.3.0) (2026-10-07)
+
+
+### Features
+
+* lazy declaration watchers and single-process workspace watch ([71907e0](https://github.com/smallcase/sc-fe-bite/commit/71907e0e1b4a1cd93f042773000c4e1bc5fabc0a))
+* start declaration watchers lazily in watch mode ([ed8e4e6](https://github.com/smallcase/sc-fe-bite/commit/ed8e4e610d9ba3c481fd18da535ad2a375d773f0))
+* watch all workspace packages from one process ([c75511f](https://github.com/smallcase/sc-fe-bite/commit/c75511f1338a9a28f87f449bb1565fb04871f764))
+
+
+### Bug Fixes
+
+* report packages as watched only once chokidar is ready ([e84832d](https://github.com/smallcase/sc-fe-bite/commit/e84832d910b45ff21c369835fce287646e380bad))
+
 ## [3.2.1](https://github.com/smallcase/sc-fe-bite/compare/v3.2.0...v3.2.1) (2026-09-17)
 
 
