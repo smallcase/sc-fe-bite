@@ -117,3 +117,77 @@ test('watch copies declaration changes and survives JS-to-TS migration', async (
   );
   assert.equal(watch.child.exitCode, null);
 });
+
+test('watch skips up-to-date outputs and starts declarations lazily', async (t) => {
+  const f = await fixture(t);
+  await f.write('a.ts', 'export const a = 1;');
+  await f.write('b.ts', 'export const b = 1;');
+  const build = f.run();
+  assert.equal((await build.closed)[0], 0, build.output());
+  const untouched = (await fs.stat(path.join(f.dir, 'dist/b.js'))).mtimeMs;
+  const watch = f.run('--watch');
+  await until(
+    async () =>
+      watch.output().includes(`Watching ${path.join(f.dir, 'src')} for changes`),
+    'watch ready'
+  );
+  assert.doesNotMatch(watch.output(), /Starting compilation/);
+  await f.write('a.ts', 'export const a = "x";');
+  await until(
+    async () => (await f.read('a.d.ts')).includes('"x"'),
+    'lazy declaration update'
+  );
+  assert.equal(
+    (await fs.stat(path.join(f.dir, 'dist/b.js'))).mtimeMs,
+    untouched
+  );
+});
+
+test('workspace watch runs every bite package in one process', async (t) => {
+  const f = await fixture(t);
+  const put = async (name, contents) => {
+    const file = path.join(f.dir, name);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      typeof contents === 'string' ? contents : JSON.stringify(contents)
+    );
+  };
+  const exists = (name) =>
+    fs.access(path.join(f.dir, name)).then(
+      () => true,
+      () => false
+    );
+  await put('package.json', { private: true, workspaces: ['packages/*'] });
+  await put('packages/a/package.json', {
+    scripts: { 'build:watch': 'tsx-transform --watch' },
+  });
+  await put('packages/a/src/a.ts', 'export const a = 1;');
+  await put('packages/b/package.json', {
+    scripts: { 'build:watch': 'tsx-transform --watch --src=lib --dist=out' },
+  });
+  await put('packages/b/lib/b.tsx', 'export const b = <div />;');
+  await put('packages/c/package.json', {
+    scripts: { 'build:watch': 'webpack --watch' },
+  });
+  await put('packages/c/src/c.ts', 'export const c = 1;');
+  const watch = f.run('--watch', '--workspace');
+  await until(
+    async () =>
+      watch.output().includes('Watching 2 packages') &&
+      (await exists('packages/a/dist/a.d.ts')) &&
+      (await exists('packages/b/out/b.jsx')),
+    'workspace ready'
+  );
+  assert.equal(await exists('packages/c/dist'), false);
+  await put('packages/b/lib/b.tsx', 'export const b = "changed";');
+  await until(
+    async () =>
+      (
+        await fs.readFile(path.join(f.dir, 'packages/b/out/b.d.ts'), 'utf8')
+      ).includes('"changed"'),
+    'declaration update in a non-default layout'
+  );
+  assert.match(watch.output(), /\[b\] Transformed b\.tsx/);
+  assert.equal(watch.child.exitCode, null);
+});

@@ -98,3 +98,37 @@ export function getWorkspaceAmbientFiles(srcDir: string): string[] {
     .map((entry) => path.join(root, entry.name))
     .filter((p) => !looksLikeToolingEnvFile(p));
 }
+
+/**
+ * Package directories of the workspace rooted at `root`, from `workspaces`
+ * in package.json, else `packages` in lerna.json.
+ */
+export function findWorkspacePackages(root: string): string[] {
+  const read = (file: string) =>
+    fs.existsSync(path.join(root, file))
+      ? JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'))
+      : {};
+  const { workspaces } = read('package.json');
+  const patterns: string[] =
+    (Array.isArray(workspaces) ? workspaces : workspaces?.packages) ??
+    read('lerna.json').packages ??
+    [];
+  if (!patterns.length) {
+    throw new Error(
+      `No workspace packages in ${root}: add "workspaces" to package.json or "packages" to lerna.json.`
+    );
+  }
+  // ponytail: supports `dir/*` and plain directories, the common shapes; use a
+  // glob library if workspaces need `**` or negated patterns.
+  return patterns
+    .flatMap((pattern) => {
+      if (!pattern.endsWith('/*')) return [path.resolve(root, pattern)];
+      const parent = path.resolve(root, pattern.slice(0, -2));
+      if (!fs.existsSync(parent)) return [];
+      return fs
+        .readdirSync(parent, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => path.join(parent, entry.name));
+    })
+    .filter((dir) => fs.existsSync(path.join(dir, 'package.json')));
+}
