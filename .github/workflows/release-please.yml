@@ -17,4 +17,4 @@ jobs:
         uses: googleapis/release-please-action@v4
         with:
           release-type: node
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.CASE_PKG_WRITE }}

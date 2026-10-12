@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - '*'
+  # Publishes the version in package.json of the selected ref, e.g. to retry
+  # a release whose tag run failed.
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -11,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: write-all
     env:
-      GH_NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_NPM_TOKEN: ${{ secrets.CASE_PKG_WRITE }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
