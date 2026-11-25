@@ -17,14 +17,14 @@ jobs:
       GH_NPM_TOKEN: ${{ secrets.CASE_PKG_WRITE }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
 
       - name: Setup Volta
-        uses: volta-cli/action@v4
+        uses: volta-cli/action@615a78f6c83e116339c53b94f3f82b4d6c0b7d18  # v5.0.0
 
       # pnpm is not pre-installed on ubuntu-latest runners; Volta manages node only.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320  # v5.0.0
         with:
           version: 11.19.0
 
